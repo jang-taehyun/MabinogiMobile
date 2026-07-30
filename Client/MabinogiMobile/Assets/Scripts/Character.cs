@@ -23,6 +23,6 @@ public class Character : MonoBehaviour
 
     public void MoveCharacter(float y)
     {
-        transform.position.Set(transform.position.x, y, transform.position.z);
+        transform.position = new Vector3(transform.position.x, y, transform.position.z);
     }
 }

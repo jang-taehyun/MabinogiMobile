@@ -37,8 +37,9 @@ public class Network : MonoBehaviour, IDisposable
 
     void Update()
     {
-        if(socket.Poll(0, SelectMode.SelectRead) is true)
+        if(socket.Available > 0)
         {
+            Debug.Log("receive data from server");
             ReadData();
         }
     }
@@ -52,43 +53,20 @@ public class Network : MonoBehaviour, IDisposable
     {
         using (NetworkStream ns = new NetworkStream(socket))
         {
-            byte[][] buffer = new byte[10][];
-
-            buffer[0] = BitConverter.GetBytes(ts.position.x);
-            buffer[1] = BitConverter.GetBytes(ts.position.y);
-            buffer[2] = BitConverter.GetBytes(ts.position.z);
-
-            buffer[3] = BitConverter.GetBytes(ts.rotation.x);
-            buffer[4] = BitConverter.GetBytes(ts.rotation.y);
-            buffer[5] = BitConverter.GetBytes(ts.rotation.z);
-            buffer[6] = BitConverter.GetBytes(ts.rotation.w);
-
-            buffer[7] = BitConverter.GetBytes(ts.localScale.x);
-            buffer[8] = BitConverter.GetBytes(ts.localScale.y);
-            buffer[9] = BitConverter.GetBytes(ts.localScale.z);
-
-            foreach (byte[] data in buffer)
-                ns.Write(data, 0, data.Length);
+            byte[] buffer = BitConverter.GetBytes(ts.position.y);
+            ns.Write(buffer, 0, buffer.Length);
         }
     }
 
     private void ReadData()
     {
-        float[] ts = new float[10];
+        float ts;
 
         using (NetworkStream ns = new NetworkStream(socket))
         {
-            byte[][] buffer = new byte[10][];
-
-            for (int i = 0; i < 10; ++i)
-            {
-                buffer[i] = new byte[4];
-                ns.Read(buffer[i], 0, 4);
-            }
-                
-
-            for (int i = 0; i < 10; ++i)
-                ts[i] = BitConverter.ToSingle(buffer[i]);
+            byte[] buffer = new byte[4];
+            ns.Read(buffer, 0, 4);
+            ts = BitConverter.ToSingle(buffer);
         }
 
         if (Players.ContainsKey(1) is false)
@@ -107,6 +85,6 @@ public class Network : MonoBehaviour, IDisposable
 
         Character c = Players[1].GetComponent<Character>();
         if (c is not null)
-            c.MoveCharacter(ts[1]);
+            c.MoveCharacter(ts);
     }
 }
