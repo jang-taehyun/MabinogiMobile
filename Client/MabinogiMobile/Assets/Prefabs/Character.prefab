@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2717113425078211527}
   - component: {fileID: 2822728336840596550}
   - component: {fileID: 750838795153202182}
-  - component: {fileID: 4333261563339197647}
+  - component: {fileID: -2636428781365232814}
   m_Layer: 0
   m_Name: Character
   m_TagString: Untagged
@@ -113,7 +113,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &4333261563339197647
+--- !u!114 &-2636428781365232814
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -122,7 +122,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 5021366723619141850}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 75ede050fd4c1f34691345ce59d91b3e, type: 3}
+  m_Script: {fileID: 11500000, guid: 337589471243d27448c81beabe9105d6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Character
   ID: 0

@@ -5,7 +5,7 @@ namespace MabinogiMobileServer
 {
     class Exception : System.Exception
     {
-        public string Message { get; }
+        public string Log { get; } = "";
         public string FilePath { get; }
         public int LineNumber { get; }
 
@@ -15,14 +15,14 @@ namespace MabinogiMobileServer
             [CallerLineNumber] int LineNumber = 0
             )
         {
-            Message = msg;
+            Log = msg;
             this.FilePath = FilePath;
             this.LineNumber = LineNumber;
         }
 
         public void OutputExceptionLog()
         {
-            Console.WriteLine($"message : {Message}");
+            Console.WriteLine($"message : {Log}");
             Console.WriteLine(
                 $"""
                     Code Location

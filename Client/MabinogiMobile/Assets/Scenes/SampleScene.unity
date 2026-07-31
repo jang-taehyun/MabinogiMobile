@@ -458,10 +458,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 887945373}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 87acb8babe080a74e829911713b069df, type: 3}
+  m_Script: {fileID: 11500000, guid: 27cb748777f1a7c4db44192633b480f4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Spawner
-  CharacterPrefab: {fileID: 5021366723619141850, guid: 138c1598454d4474986484a0043f4f6c, type: 3}
+  CharacterPrefab: {fileID: 5021366723619141850, guid: dd81be4ce2af40e4ca431675b5c3126b, type: 3}
   NetworkManager: {fileID: 1717127828}
 --- !u!4 &887945375
 Transform:
@@ -504,7 +504,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1717127828}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e6ee75c48e849ee4082ff9971fff3b33, type: 3}
+  m_Script: {fileID: 11500000, guid: 6973276d555281241930e2132ac3a58f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Network
   SpawnObj: {fileID: 887945373}
