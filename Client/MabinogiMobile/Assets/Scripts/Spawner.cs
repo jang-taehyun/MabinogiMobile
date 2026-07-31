@@ -9,12 +9,24 @@ public class Spawner : MonoBehaviour
     {
         Network nm = NetworkManager.GetComponent<Network>();
 
-        GameObject spawnObj = Instantiate(CharacterPrefab, transform);
-        Character c = spawnObj.GetComponent<Character>();
-        if (c is not null && nm is not null)
-            c.SendEvent += nm.SendData;
-        c.InitComp();
+        GameObject SpawnCharacter = Instantiate(CharacterPrefab, transform);
+        Character CastingCharacter = SpawnCharacter.GetComponent<Character>();
+        if (CastingCharacter is not null && nm is not null)
+            CastingCharacter.SendEvent += nm.SendData;
 
-        return spawnObj;
+        return SpawnCharacter;
+    }
+
+    public Object SpawnOther(float y)
+    {
+        Network nm = NetworkManager.GetComponent<Network>();
+
+        Vector3 pos = new Vector3(0.0f, y, 0.0f);
+        GameObject SpawnCharacter = Instantiate(CharacterPrefab, pos, Quaternion.identity);
+        Character CastingCharacter = SpawnCharacter.GetComponent<Character>();
+        if (CastingCharacter is not null && nm is not null)
+            CastingCharacter.SendEvent += nm.SendData;
+
+        return SpawnCharacter;
     }
 }

@@ -30,7 +30,11 @@ namespace MabinogiMobileServer
             Socket? client = listener.AcceptClient();
             if (client is not null)
             {
-                ClientList.Add(ClientList.Count, client);
+                int ClientID = ClientList.Count;
+                ClientList.Add(ClientID, client);
+
+                byte[] buffer = BitConverter.GetBytes(0);
+                Broadcast(buffer, ClientID);
             }
         }
 
@@ -47,22 +51,26 @@ namespace MabinogiMobileServer
                     }
 
                     float data = BitConverter.ToSingle(buffer);
-                    SendData(buffer, item.Key);
+                    Broadcast(buffer, item.Key);
                 }
             }
         }
 
-        public void SendData(byte[] Buffer, int SenderID)
+        public void SendData(byte[] Buffer, Socket client)
         {
-            // send data all client
-            foreach (var item in ClientList)
+            using (NetworkStream ns = new NetworkStream(client))
             {
-                if (item.Key != SenderID)
+                ns.Write(Buffer, 0, Buffer.Length);
+            }
+        }
+
+        public void Broadcast(byte[] Buffer, int? ExcludeID = null)
+        {
+            foreach(var item in ClientList)
+            {
+                if(ExcludeID is null || (ExcludeID is not null && item.Key != ExcludeID))
                 {
-                    using (NetworkStream ns = new NetworkStream(item.Value))
-                    {
-                        ns.Write(Buffer, 0, Buffer.Length);
-                    }
+                    SendData(Buffer, item.Value);
                 }
             }
         }
@@ -124,7 +132,7 @@ namespace MabinogiMobileServer
                 Socket? client = null;
 
                 // client connected
-                if (ListenSocket?.Available > 0)
+                if (ListenSocket?.Poll(0, SelectMode.SelectRead) is true)
                 {
                     client = ListenSocket.Accept();
                     Console.WriteLine($"client connected!");

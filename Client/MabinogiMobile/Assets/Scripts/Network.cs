@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class Network : MonoBehaviour, IDisposable
 {
-    public GameObject SpawnObj;
+    public GameObject CharacterSpawner;
 
     private Dictionary<int, GameObject> Players = new Dictionary<int, GameObject>();
 
@@ -22,10 +22,27 @@ public class Network : MonoBehaviour, IDisposable
             socket.Connect(ServerIP, ServerPort);
             Debug.Log("Server connected!");
 
-            Spawner s = SpawnObj.GetComponent<Spawner>();
+            // local player 생성
+            Spawner s = CharacterSpawner.GetComponent<Spawner>();
             if(s is not null)
             {
                 Players.Add(0, (GameObject)s.SpawnOther(transform));
+            }
+
+            // remote player 생성
+            using (NetworkStream ns = new NetworkStream(socket))
+            {
+                byte[] buffer = new byte[4];
+                while (socket.Available > 0)
+                {
+                    ns.Read(buffer, 0, 4);
+                    int RemotePlayerID = BitConverter.ToInt32(buffer, 0);
+
+                    ns.Read(buffer, 0, 4);
+                    float RemotePlayerPosY = BitConverter.ToSingle(buffer, 0);
+
+                    Players.Add(RemotePlayerID, (GameObject)s.SpawnOther(RemotePlayerPosY));
+                }
             }
                 
         }
@@ -71,7 +88,7 @@ public class Network : MonoBehaviour, IDisposable
 
         if (Players.ContainsKey(1) is false)
         {
-            Spawner s = SpawnObj.GetComponent<Spawner>();
+            Spawner s = CharacterSpawner.GetComponent<Spawner>();
             if (s is not null)
             {
                 GameObject SpawnCharacter = (GameObject)s.SpawnOther(transform);
