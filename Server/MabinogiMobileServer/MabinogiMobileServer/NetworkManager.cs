@@ -55,7 +55,8 @@ namespace MabinogiMobileServer
                 Console.WriteLine($"New Client connected : {NewPlayer.PlayerID}");
 
                 // broadcast packet that new client connected
-                Broadcast(BitConverter.GetBytes(0), NewPlayer.PlayerID);
+                buffer = SerializeData(NewPlayer.PlayerID, NewPlayer.yPos);
+                Broadcast(buffer, NewPlayer.PlayerID);
             }
         }
 
