@@ -507,7 +507,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6973276d555281241930e2132ac3a58f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Network
-  SpawnObj: {fileID: 887945373}
+  CharacterSpawner: {fileID: 887945373}
 --- !u!4 &1717127830
 Transform:
   m_ObjectHideFlags: 0

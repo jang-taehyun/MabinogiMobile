@@ -5,19 +5,22 @@ public class Spawner : MonoBehaviour
     public GameObject CharacterPrefab;
     public GameObject NetworkManager;
 
-    public Object SpawnOther(Transform transform)
+    public Object SpawnOther(Transform transform, bool IsLocalPlayer = false)
     {
         Network nm = NetworkManager.GetComponent<Network>();
 
         GameObject SpawnCharacter = Instantiate(CharacterPrefab, transform);
         Character CastingCharacter = SpawnCharacter.GetComponent<Character>();
         if (CastingCharacter is not null && nm is not null)
+        {
             CastingCharacter.SendEvent += nm.SendData;
+            CastingCharacter.IsLocal = IsLocalPlayer;
+        }
 
         return SpawnCharacter;
     }
 
-    public Object SpawnOther(float y)
+    public Object SpawnOther(float y, bool IsLocalPlayer = false)
     {
         Network nm = NetworkManager.GetComponent<Network>();
 
@@ -25,7 +28,10 @@ public class Spawner : MonoBehaviour
         GameObject SpawnCharacter = Instantiate(CharacterPrefab, pos, Quaternion.identity);
         Character CastingCharacter = SpawnCharacter.GetComponent<Character>();
         if (CastingCharacter is not null && nm is not null)
+        {
             CastingCharacter.SendEvent += nm.SendData;
+            CastingCharacter.IsLocal = IsLocalPlayer;
+        }
 
         return SpawnCharacter;
     }
