@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace MabinogiMobileServer
+namespace CoreModule
 {
-    class Exception : System.Exception
+    public class MobinogiException : System.Exception
     {
         public string Log { get; } = "";
         public string FilePath { get; }
         public int LineNumber { get; }
 
-        public Exception(
+        public MobinogiException(
             string msg,
             [CallerFilePath] string FilePath = "",
             [CallerLineNumber] int LineNumber = 0
@@ -23,13 +23,7 @@ namespace MabinogiMobileServer
         public void OutputExceptionLog()
         {
             Console.WriteLine($"message : {Log}");
-            Console.WriteLine(
-                $"""
-                    Code Location
-                    file path : {FilePath},
-                    line : {LineNumber}
-                """
-            );
+            Console.WriteLine($"Code Location\nfile path : {FilePath}\nline : {LineNumber}");
         }
     }
 }

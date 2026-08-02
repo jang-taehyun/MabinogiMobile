@@ -1,9 +1,8 @@
-﻿using JetBrains.Annotations;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
-using Unity.AppUI.UI;
 using UnityEngine;
+using CoreModule;
 
 public class Network : MonoBehaviour, IDisposable
 {
@@ -21,37 +20,47 @@ public class Network : MonoBehaviour, IDisposable
     {
         try
         {
-            int PlayerID = 0;
-
             // connect server
             socket = new Socket(addressFamily: AddressFamily.InterNetwork, socketType: SocketType.Stream, protocolType: ProtocolType.Tcp);
             socket.Connect(ServerIP, ServerPort);
             Debug.Log("Server connected!");
 
-            // local player 생성
+            // create local player
             Spawner s = CharacterSpawner.GetComponent<Spawner>();
             if(s is not null)
             {
                 // get allocated PlayerID
-                ReadData(out PlayerID);
-                ID = PlayerID;
+                IPacket? AllocatedPacket = null;
+                while(AllocatedPacket is null)
+                {
+                    AllocatedPacket = ReadData(packetID: PacketID.AllocatedPlayerID);
+                }
+                AllocatedPlayerIDPacket packet = (AllocatedPlayerIDPacket)AllocatedPacket;
+                if (packet is not null)
+                    ID = packet.PlayerID;
 
-                UnityEngine.Object SpawnObject = s.SpawnOther(transform, true);
+                // spawn local player
+                UnityEngine.Object SpawnObject = s.SpawnOther(new Vector3(0, 0, 0), new Quaternion(0, 0, 0, 0), true);
                 Players.Add(ID, (GameObject)SpawnObject);
+                Debug.Log($"[my ID {ID}, start()] : create local");
             }
 
-            // remote player 생성
-            using (NetworkStream ns = new NetworkStream(socket))
+            // create remote player
+            while(true)
             {
-                byte[] buffer = new byte[8];
-                float yPos = 0.0f;
-                while (socket.Available > 0)
+                IPacket? OtherClientPacket = ReadData(packetID: PacketID.Transform);
+                if (OtherClientPacket is null)
+                    break;
+
+                TransformPacket packet = (TransformPacket)OtherClientPacket;
+                if (packet is not null)
                 {
-                    ReadData(out PlayerID, out yPos);
-                    Players.Add(PlayerID, (GameObject)s.SpawnOther(yPos));
+                    Vector3 pos = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
+                    Quaternion rot = new Quaternion(packet.Rotation[0], packet.Rotation[1], packet.Rotation[2], packet.Rotation[3]);
+                    Players.Add(packet.PlayerID, (GameObject)s.SpawnOther(pos, rot));
+                    Debug.Log($"[my ID {ID}, start()] : create player {packet.PlayerID}");
                 }
             }
-                
         }
         catch(Exception e)
         {
@@ -61,27 +70,32 @@ public class Network : MonoBehaviour, IDisposable
 
     void Update()
     {
-        int PlayerID = 0;
-        float yPos = 0.0f;
-
         while(true)
         {
-            ReadData(out PlayerID, out yPos);
-
-            if (PlayerID is 0)
+            IPacket? RecievePacket = ReadData(packetID: PacketID.Transform);
+            if (RecievePacket is null)
                 break;
 
-            if(Players.ContainsKey(PlayerID) is false)
+            TransformPacket packet = (TransformPacket)RecievePacket;
+            if (packet is null)
             {
-                // recieve new client
+                break;
+            }
+
+            if (Players.ContainsKey(packet.PlayerID) is false)
+            {
+                // create new client
+                Vector3 pos = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
+                Quaternion rot = new Quaternion(packet.Rotation[0], packet.Rotation[1], packet.Rotation[2], packet.Rotation[3]);
                 Spawner s = CharacterSpawner.GetComponent<Spawner>();
-                Players.Add(PlayerID, (GameObject)s.SpawnOther(yPos));
+                Players.Add(packet.PlayerID, (GameObject)s.SpawnOther(pos, rot));
+                Debug.Log($"[my ID {ID}, update()] : create player {packet.PlayerID}");
             }
 
             // move remote player
-            Character c = Players[PlayerID].GetComponent<Character>();
+            Character c = Players[packet.PlayerID].GetComponent<Character>();
             if (c is not null)
-                c.MoveCharacter(yPos);
+                c.MoveCharacter(packet);
         }
     }
 
@@ -90,84 +104,42 @@ public class Network : MonoBehaviour, IDisposable
         socket?.Close();
     }
 
-    public void SendData(Transform ts)
+    public void SendData(byte[] buffer)
     {
-        byte[] buffer = SerializeData(ID, ts.position.y);
-
         using (NetworkStream ns = new NetworkStream(socket))
         {
             ns.Write(buffer, 0, buffer.Length);
         }
     }
 
-    private void ReadData(out int PlayerID, out float yPos)
+    public IPacket? ReadData(PacketID packetID)
     {
-        PlayerID = 0;
-        yPos = 0.0f;
+        IPacket? packet = null;
+        if (socket.Available <= 0)
+            return packet;
 
-        if (socket.Available > 0)
+        if(packetID == PacketID.AllocatedPlayerID)
         {
-            // read packet
-            byte[] buffer = new byte[8];
+            byte[] buffer = new byte[AllocatedPlayerIDPacket.PacketSize];
             using (NetworkStream ns = new NetworkStream(socket))
             {
-                ns.Read(buffer, 0, 8);
+                ns.Read(buffer, 0, buffer.Length);
             }
 
-            // deserialize packet
-            DeserializeData(buffer, out PlayerID, out yPos);
-
-            Debug.Log("receive data from server");
+            packet = new AllocatedPlayerIDPacket(buffer);
         }
-    }
 
-    private void ReadData(out int PlayerID)
-    {
-        // read packet
-        byte[] buffer = new byte[4];
-        using (NetworkStream ns = new NetworkStream(socket))
+        if (packetID == PacketID.Transform)
         {
-            ns.Read(buffer, 0, 4);
+            byte[] buffer = new byte[TransformPacket.PacketSize];
+            using (NetworkStream ns = new NetworkStream(socket))
+            {
+                ns.Read(buffer, 0, buffer.Length);
+            }
+
+            packet = new TransformPacket(buffer);
         }
 
-        // deserialize packet
-        DeserializeData(buffer, out PlayerID);
-    }
-
-    private byte[] SerializeData(int PlayerID, float Data)
-    {
-        byte[] buffer = new byte[8];
-
-        // serialize player ID
-        byte[] SerializeResult = BitConverter.GetBytes(PlayerID);
-        Array.Copy(SerializeResult, 0, buffer, 0, SerializeResult.Length);
-
-        // serialize data
-        SerializeResult = BitConverter.GetBytes(Data);
-        Array.Copy(SerializeResult, 0, buffer, 4, SerializeResult.Length);
-
-        return buffer;
-    }
-
-    private void DeserializeData(byte[] buffer, out int PlayerID, out float Data)
-    {
-        byte[] DeserializeResult = new byte[4];
-
-        // deserialize player ID
-        Array.Copy(buffer, 0, DeserializeResult, 0, 4);
-        PlayerID = BitConverter.ToInt32(DeserializeResult);
-
-        // deserialize data
-        Array.Copy(buffer, 4, DeserializeResult, 0, 4);
-        Data = BitConverter.ToSingle(DeserializeResult);
-    }
-
-    private void DeserializeData(byte[] buffer, out int PlayerID)
-    {
-        byte[] DeserializeResult = new byte[4];
-
-        // deserialize player ID
-        Array.Copy(buffer, 0, DeserializeResult, 0, 4);
-        PlayerID = BitConverter.ToInt32(DeserializeResult);
+        return packet;
     }
 }

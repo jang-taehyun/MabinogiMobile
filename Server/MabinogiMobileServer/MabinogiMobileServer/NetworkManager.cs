@@ -1,13 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using CoreModule;
 
 namespace MabinogiMobileServer
 {
     class NetworkManager : IDisposable
     {
-        private static NetworkManager _inst;
+        private static NetworkManager? _inst;
         public static NetworkManager NetworkManagerInstance
         {
             get
@@ -19,7 +21,7 @@ namespace MabinogiMobileServer
         }
 
         Listener listener = Listener.Instance;
-        Dictionary<Player, Socket> ClientList = new Dictionary<Player, Socket>();
+        public Dictionary<int, Player> ClientList { get; private set; } = new Dictionary<int, Player>();
 
         private NetworkManager() { }
 
@@ -30,96 +32,98 @@ namespace MabinogiMobileServer
             Socket? NewClient = listener.AcceptClient();
             if (NewClient is not null)
             {
-                // add client to ClientList
-                Player NewPlayer = new Player()
-                {
-                    PlayerID = new Random().Next(1, 100),
-                    yPos = 0
-                };
-                ClientList.Add(NewPlayer, NewClient);
-
                 // allocate client ID to New client
-                SendData(BitConverter.GetBytes(NewPlayer.PlayerID), NewClient);
-
-                // send client info to New client
-                byte[] buffer;
-                foreach (var item in ClientList)
+                Player NewPlayer = new Player()
+                { 
+                    sock = NewClient
+                };
+                do
                 {
-                    if (item.Key.PlayerID != NewPlayer.PlayerID)
-                    {
-                        buffer = SerializeData(item.Key.PlayerID, item.Key.yPos);
-                        SendData(buffer, NewClient);
-                    }
-                }
+                    NewPlayer.PlayerID = new Random().Next(1, 100);
+                } while (ClientList.ContainsKey(NewPlayer.PlayerID) is true);
+                SendData(new AllocatedPlayerIDPacket(NewPlayer.PlayerID).Buffer, NewClient);
 
+                // add new client to ClientList
+                ClientList.Add(NewPlayer.PlayerID, NewPlayer);
                 Console.WriteLine($"New Client connected : {NewPlayer.PlayerID}");
 
-                // broadcast packet that new client connected
-                buffer = SerializeData(NewPlayer.PlayerID, NewPlayer.yPos);
-                Broadcast(buffer, NewPlayer.PlayerID);
-            }
-        }
-
-        public void ReadData()
-        {
-            foreach (var item in ClientList)
-            {
-                if (item.Value.Available > 0)
+                // send client list info to New client
+                TransformPacket packet;
+                foreach (var item in ClientList)
                 {
-                    byte[] buffer = new byte[8];
-                    float data = 0.0f;
-                    int PlayerID = 0;
-
-                    // read data
-                    using (NetworkStream ns = new NetworkStream(item.Value))
+                    if (item.Key != NewPlayer.PlayerID)
                     {
-                        ns.Read(buffer, 0, 8);
+                        packet = new TransformPacket(item.Value.PlayerID, item.Value.Transform);
+                        SendData(packet.Buffer, NewClient);
                     }
-                    DeserializeData(buffer, out PlayerID, out data);
-
-                    // edit client info in server
-                    foreach (var client in ClientList)
-                    {
-                        if (client.Key.PlayerID == PlayerID)
-                        {
-                            client.Key.yPos = data;
-                            break;
-                        }
-                    }
-
-                    // broadcast
-                    Broadcast(buffer, item.Key.PlayerID);
                 }
+
+                // broadcast packet that new client connected
+                packet = new TransformPacket(NewPlayer.PlayerID, NewPlayer.Transform);
+                Broadcast(packet.Buffer, NewPlayer.PlayerID);
             }
         }
 
-        public byte[] SerializeData(int PlayerID, float Data)
+        public IPacket? ReadData(PacketID packetID, Socket socket)
         {
-            byte[] buffer = new byte[8];
+            IPacket? packet = null;
 
-            // serialize player ID
-            byte[] SerializeResult = BitConverter.GetBytes(PlayerID);
-            Array.Copy(SerializeResult, 0, buffer, 0, SerializeResult.Length);
+            if ((socket.Available > 0) is false)
+                return packet;
 
-            // serialize data
-            SerializeResult = BitConverter.GetBytes(Data);
-            Array.Copy(SerializeResult, 0, buffer, 4, SerializeResult.Length);
+            byte[] buffer;
+            if (packetID is PacketID.AllocatedPlayerID)
+            {
+                buffer = new byte[AllocatedPlayerIDPacket.PacketSize];
+                using (NetworkStream ns = new NetworkStream(socket))
+                {
+                    ns.Read(buffer, 0, buffer.Length);
+                }
 
-            return buffer;
+                packet = new AllocatedPlayerIDPacket(buffer);
+            }
+
+            if (packetID is PacketID.Transform)
+            {
+                buffer = new byte[TransformPacket.PacketSize];
+                using (NetworkStream ns = new NetworkStream(socket))
+                {
+                    ns.Read(buffer, 0, buffer.Length);
+                }
+
+                packet = new TransformPacket(buffer);
+            }
+
+            return packet;
         }
 
-        public void DeserializeData(byte[] buffer, out int PlayerID, out float Data)
-        {
-            byte[] DeserializeResult = new byte[4];
+        //public byte[] SerializeData(int PlayerID, float Data)
+        //{
+        //    byte[] buffer = new byte[8];
 
-            // deserialize player ID
-            Array.Copy(buffer, 0, DeserializeResult, 0, 4);
-            PlayerID = BitConverter.ToInt32(DeserializeResult);
+        //    // serialize player ID
+        //    byte[] SerializeResult = BitConverter.GetBytes(PlayerID);
+        //    Array.Copy(SerializeResult, 0, buffer, 0, SerializeResult.Length);
 
-            // deserialize data
-            Array.Copy(buffer, 4, DeserializeResult, 0, 4);
-            Data = BitConverter.ToSingle(DeserializeResult);
-        }
+        //    // serialize data
+        //    SerializeResult = BitConverter.GetBytes(Data);
+        //    Array.Copy(SerializeResult, 0, buffer, 4, SerializeResult.Length);
+
+        //    return buffer;
+        //}
+
+        //public void DeserializeData(byte[] buffer, out int PlayerID, out float Data)
+        //{
+        //    byte[] DeserializeResult = new byte[4];
+
+        //    // deserialize player ID
+        //    Array.Copy(buffer, 0, DeserializeResult, 0, 4);
+        //    PlayerID = BitConverter.ToInt32(DeserializeResult);
+
+        //    // deserialize data
+        //    Array.Copy(buffer, 4, DeserializeResult, 0, 4);
+        //    Data = BitConverter.ToSingle(DeserializeResult);
+        //}
 
         public void SendData(byte[] Buffer, Socket client)
         {
@@ -133,10 +137,9 @@ namespace MabinogiMobileServer
         {
             foreach(var item in ClientList)
             {
-                if(ExcludeID is null || (ExcludeID is not null && item.Key.PlayerID != ExcludeID))
+                if(ExcludeID is null || (ExcludeID is not null && item.Key != ExcludeID))
                 {
-                    SendData(Buffer, item.Value);
-                    Console.WriteLine($"send message to {item.Key.PlayerID}");
+                    SendData(Buffer, item.Value.sock);
                 }
             }
         }
@@ -145,7 +148,7 @@ namespace MabinogiMobileServer
         {
             // end
             foreach (var item in ClientList)
-                item.Value.Close();
+                item.Value.sock.Close();
         }
 
 
@@ -172,15 +175,15 @@ namespace MabinogiMobileServer
                 {
                     IPEndPoint LocalAddress = new IPEndPoint(address: IPAddress.Any, PortNumber);
                     if (LocalAddress is null)
-                        throw new Exception("Address is null");
+                        throw new MobinogiException("Address is null");
 
                     ListenSocket = new Socket(addressFamily: AddressFamily.InterNetwork, socketType: SocketType.Stream, protocolType: ProtocolType.Tcp);
                     if (ListenSocket is null)
-                        throw new Exception("Listener is null");
+                        throw new MobinogiException("Listener is null");
 
                     ListenSocket.Bind(LocalAddress);
                 }
-                catch (Exception e)
+                catch (MobinogiException e)
                 {
                     e.OutputExceptionLog();
                 }

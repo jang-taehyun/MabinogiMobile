@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Net.Sockets;
 
 namespace MabinogiMobileServer
 {
     class Player
     {
         public int PlayerID = 0;
-        public float yPos = 0.0f;
+        public float[] Transform = new float[10];
+        public required Socket sock { get; init; }
     }
 }
