@@ -2,8 +2,8 @@
 
 public class Spawner : MonoBehaviour
 {
-    public GameObject CharacterPrefab;
-    public GameObject NetworkManager;
+    public GameObject CharacterPrefab = null!;
+    public GameObject NetworkManager = null!;
 
     public Object SpawnOther(Vector3 Position, Quaternion Rotation, bool IsLocalPlayer = false)
     {

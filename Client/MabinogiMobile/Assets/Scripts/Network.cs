@@ -1,4 +1,6 @@
-﻿using System;
+﻿#nullable enable
+
+using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using UnityEngine;
@@ -6,12 +8,12 @@ using CoreModule;
 
 public class Network : MonoBehaviour, IDisposable
 {
-    public GameObject CharacterSpawner;
+    public GameObject CharacterSpawner = null!;
 
     private Dictionary<int, GameObject> Players = new Dictionary<int, GameObject>();
 
     public int ID { get; private set; } = 0;
-    private Socket socket;
+    private Socket socket = null!;
 
     private const string ServerIP = "127.0.0.1";
     private const int ServerPort = 33355;
@@ -27,7 +29,7 @@ public class Network : MonoBehaviour, IDisposable
 
             // create local player
             Spawner s = CharacterSpawner.GetComponent<Spawner>();
-            if(s is not null)
+            if(s != null)
             {
                 // get allocated PlayerID
                 IPacket? AllocatedPacket = null;
@@ -43,22 +45,22 @@ public class Network : MonoBehaviour, IDisposable
                 UnityEngine.Object SpawnObject = s.SpawnOther(new Vector3(0, 0, 0), new Quaternion(0, 0, 0, 0), true);
                 Players.Add(ID, (GameObject)SpawnObject);
                 Debug.Log($"[my ID {ID}, start()] : create local");
-            }
 
-            // create remote player
-            while(true)
-            {
-                IPacket? OtherClientPacket = ReadData(packetID: PacketID.Transform);
-                if (OtherClientPacket is null)
-                    break;
-
-                TransformPacket packet = (TransformPacket)OtherClientPacket;
-                if (packet is not null)
+                // create remote player
+                while (true)
                 {
-                    Vector3 pos = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
-                    Quaternion rot = new Quaternion(packet.Rotation[0], packet.Rotation[1], packet.Rotation[2], packet.Rotation[3]);
-                    Players.Add(packet.PlayerID, (GameObject)s.SpawnOther(pos, rot));
-                    Debug.Log($"[my ID {ID}, start()] : create player {packet.PlayerID}");
+                    IPacket? OtherClientPacket = ReadData(packetID: PacketID.Transform);
+                    if (OtherClientPacket is null)
+                        break;
+
+                    TransformPacket tpacket = (TransformPacket)OtherClientPacket;
+                    if (tpacket is not null)
+                    {
+                        Vector3 pos = new Vector3(tpacket.Position[0], tpacket.Position[1], tpacket.Position[2]);
+                        Quaternion rot = new Quaternion(tpacket.Rotation[0], tpacket.Rotation[1], tpacket.Rotation[2], tpacket.Rotation[3]);
+                        Players.Add(tpacket.PlayerID, (GameObject)s.SpawnOther(pos, rot));
+                        Debug.Log($"[my ID {ID}, start()] : create player {tpacket.PlayerID}");
+                    }
                 }
             }
         }

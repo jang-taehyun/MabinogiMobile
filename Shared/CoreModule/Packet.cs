@@ -22,7 +22,7 @@ namespace CoreModule
     {
         public static int PacketSize = 4;
         public int PlayerID { get; private set; } = 0;
-        public byte[] Buffer { get; private set; }
+        public byte[] Buffer { get; private set; } = null!;
         private bool IsDone = false;
 
         public AllocatedPlayerIDPacket(int PlayerID)
@@ -96,7 +96,7 @@ namespace CoreModule
             }
         }
 
-        public byte[] Buffer { get; private set; }
+        public byte[] Buffer { get; private set; } = null!;
 
         private bool IsDone = false;
 
