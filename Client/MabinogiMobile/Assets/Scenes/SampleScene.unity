@@ -461,7 +461,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27cb748777f1a7c4db44192633b480f4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Spawner
-  CharacterPrefab: {fileID: 5021366723619141850, guid: dd81be4ce2af40e4ca431675b5c3126b, type: 3}
+  CharacterPrefab: {fileID: 810976845749444983, guid: 2143173e40ca74445ab8f40e7c99b5ba, type: 3}
   NetworkManager: {fileID: 1717127828}
 --- !u!4 &887945375
 Transform:

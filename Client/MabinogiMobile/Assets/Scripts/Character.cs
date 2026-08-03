@@ -1,14 +1,41 @@
-﻿using CoreModule;
-using System;
+﻿using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using CoreModule;
 
 public class Character : MonoBehaviour
 {
+    public float MoveSpeed { get; private set; } = 5.0f;
+    public float RotateSpeed { get; private set; } = 3.0f;
+
     public bool IsLocal = false;
     public int PlayerID = 0;
     public event Action<byte[]> SendEvent = delegate (byte[] b) { };
 
+    InputAction MoveAction = null!;
+    InputAction LeftRotateAction = null!;
+    InputAction RightRotateAction = null!;
+
     private bool IsChangeColor = false;
+
+    private void Start()
+    {
+        PlayerInput InputComponent = GetComponent<PlayerInput>();
+        if (InputComponent == null)
+            throw new MobinogiException("player input component를 찾지 못함");
+
+        MoveAction = InputComponent.actions.FindAction("CharacterControl/Move");
+        if (MoveAction == null)
+            throw new MobinogiException("move action not find");
+
+        LeftRotateAction = InputComponent.actions.FindAction("CharacterControl/LeftRotate");
+        if (LeftRotateAction == null)
+            throw new MobinogiException("left rotate action not find");
+
+        RightRotateAction = InputComponent.actions.FindAction("CharacterControl/RightRotate");
+        if (RightRotateAction == null)
+            throw new MobinogiException("right rotate action not find");
+    }
 
     // Update is called once per frame
     [Obsolete("test code", false)]
@@ -23,11 +50,37 @@ public class Character : MonoBehaviour
             }
         }
 
-        if (IsLocal is true && Input.GetKeyUp(KeyCode.A) is true)
+        if (IsLocal is true)
         {
-            transform.Translate(new Vector3(0, 1, 0) * 5.0f * Time.deltaTime, Space.World);
-            SendEvent(ConvertTransformToByteArray(transform));
+            ControlCharacter();
         }
+    }
+
+    private void ControlCharacter()
+    {
+        bool IsControl = false;
+
+        Vector2 MoveValue = MoveAction.ReadValue<Vector2>();
+        if (MoveValue != Vector2.zero)
+        {
+            transform.Translate(MoveValue.normalized * MoveSpeed * Time.deltaTime);
+            IsControl = true;
+        }
+
+        if (LeftRotateAction.IsPressed())
+        {
+            transform.Rotate(new Vector3(0, -90, 0) * RotateSpeed * Time.deltaTime, Space.World);
+            IsControl = true;
+        }
+
+        if (RightRotateAction.IsPressed())
+        {
+            transform.Rotate(new Vector3(0, 90, 0) * RotateSpeed * Time.deltaTime, Space.World);
+            IsControl = true;
+        }
+
+        if (IsControl is true)
+            SendEvent(ConvertTransformToByteArray(transform));
     }
 
     public void MoveCharacter(TransformPacket packet)
