@@ -8,7 +8,7 @@ using CoreModule;
 
 public class Network : MonoBehaviour, IDisposable
 {
-    public GameObject CharacterSpawner = null!;
+    public Spawner CharacterSpawner = null!;
 
     private Dictionary<int, GameObject> Players = new Dictionary<int, GameObject>();
 
@@ -28,8 +28,7 @@ public class Network : MonoBehaviour, IDisposable
             Debug.Log("Server connected!");
 
             // create local player
-            Spawner s = CharacterSpawner.GetComponent<Spawner>();
-            if(s != null)
+            if(CharacterSpawner != null)
             {
                 // get allocated PlayerID
                 IPacket? AllocatedPacket = null;
@@ -42,7 +41,7 @@ public class Network : MonoBehaviour, IDisposable
                     ID = packet.PlayerID;
 
                 // spawn local player
-                UnityEngine.Object SpawnObject = s.SpawnOther(new Vector3(0, 0, 0), new Quaternion(0, 0, 0, 0), true);
+                UnityEngine.Object SpawnObject = CharacterSpawner.SpawnOther(new Vector3(0, 0, 0), new Quaternion(0, 0, 0, 0), true);
                 Players.Add(ID, (GameObject)SpawnObject);
                 Debug.Log($"[my ID {ID}, start()] : create local");
 
@@ -58,7 +57,7 @@ public class Network : MonoBehaviour, IDisposable
                     {
                         Vector3 pos = new Vector3(tpacket.Position[0], tpacket.Position[1], tpacket.Position[2]);
                         Quaternion rot = new Quaternion(tpacket.Rotation[0], tpacket.Rotation[1], tpacket.Rotation[2], tpacket.Rotation[3]);
-                        Players.Add(tpacket.PlayerID, (GameObject)s.SpawnOther(pos, rot));
+                        Players.Add(tpacket.PlayerID, (GameObject)CharacterSpawner.SpawnOther(pos, rot));
                         Debug.Log($"[my ID {ID}, start()] : create player {tpacket.PlayerID}");
                     }
                 }

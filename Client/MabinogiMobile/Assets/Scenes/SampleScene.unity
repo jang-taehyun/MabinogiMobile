@@ -462,7 +462,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Spawner
   CharacterPrefab: {fileID: 810976845749444983, guid: 2143173e40ca74445ab8f40e7c99b5ba, type: 3}
-  NetworkManager: {fileID: 1717127828}
+  NetworkManager: {fileID: 1717127829}
 --- !u!4 &887945375
 Transform:
   m_ObjectHideFlags: 0
@@ -507,7 +507,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6973276d555281241930e2132ac3a58f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Network
-  CharacterSpawner: {fileID: 887945373}
+  CharacterSpawner: {fileID: 887945374}
 --- !u!4 &1717127830
 Transform:
   m_ObjectHideFlags: 0
