@@ -14,9 +14,25 @@ public class Character : MonoBehaviour
     public int PlayerID = 0;
     public event Action<byte[]> SendEvent = delegate (byte[] b) { };
 
+    Animator CharacterAnimator = null!;
+
     InputAction? MoveAction = null;
     InputAction? LeftRotateAction = null;
     InputAction? RightRotateAction = null;
+
+    private void Start()
+    {
+        try
+        {
+            CharacterAnimator = GetComponentInChildren<Animator>();
+            if (CharacterAnimator is null)
+                throw new MobinogiException("character animator is not finded");
+        }
+        catch(MobinogiException e)
+        {
+            Debug.Log(e.Message);
+        }
+    }
 
     // Update is called once per frame
     [Obsolete("test code", false)]
@@ -38,7 +54,12 @@ public class Character : MonoBehaviour
             if (MoveValue != Vector2.zero)
             {
                 transform.Translate(MoveValue.normalized * MoveSpeed * Time.deltaTime);
+                CharacterAnimator.SetFloat("MoveSpeed", MoveSpeed);
                 IsControl = true;
+            }
+            else
+            {
+                CharacterAnimator.SetFloat("MoveSpeed", 0.0f);
             }
         }
 
