@@ -77,7 +77,7 @@ namespace MabinogiMobileServer
                 buffer = new byte[AllocatedPlayerIDPacket.PacketSize];
                 using (NetworkStream ns = new NetworkStream(socket))
                 {
-                    ns.Read(buffer, 0, buffer.Length);
+                    ns.ReadExactly(buffer, 0, buffer.Length);
                 }
 
                 packet = new AllocatedPlayerIDPacket(buffer);
@@ -88,7 +88,7 @@ namespace MabinogiMobileServer
                 buffer = new byte[TransformPacket.PacketSize];
                 using (NetworkStream ns = new NetworkStream(socket))
                 {
-                    ns.Read(buffer, 0, buffer.Length);
+                    ns.ReadExactly(buffer, 0, buffer.Length);
                 }
 
                 packet = new TransformPacket(buffer);
