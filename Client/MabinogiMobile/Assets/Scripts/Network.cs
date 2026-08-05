@@ -1,10 +1,11 @@
 ﻿#nullable enable
 
+using CoreModule;
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using UnityEditor.PackageManager;
 using UnityEngine;
-using CoreModule;
 
 public class Network : MonoBehaviour, IDisposable
 {
@@ -128,11 +129,12 @@ public class Network : MonoBehaviour, IDisposable
         socket?.Close();
     }
 
-    public void SendData(byte[] buffer)
+    public void SendData(PacketID ID, byte[] buffer)
     {
+        byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(ID), buffer);
         using (NetworkStream ns = new NetworkStream(socket))
         {
-            ns.Write(buffer, 0, buffer.Length);
+            ns.Write(packet, 0, packet.Length);
         }
     }
 
@@ -145,7 +147,7 @@ public class Network : MonoBehaviour, IDisposable
             return packet;
         }
 
-        // check header
+        // read header
         using (NetworkStream ns = new NetworkStream(socket))
         {
             byte[] header = new byte[PacketHeader.HeaderSize];

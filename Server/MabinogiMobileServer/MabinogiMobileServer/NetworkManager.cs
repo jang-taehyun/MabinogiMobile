@@ -41,9 +41,7 @@ namespace MabinogiMobileServer
                 {
                     NewPlayer.PlayerID = new Random().Next(1, 100);
                 } while (ClientList.ContainsKey(NewPlayer.PlayerID) is true);
-
-                byte[] buffer = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(PacketID.AllocatedPlayerID), new AllocatedPlayerIDPacket(NewPlayer.PlayerID).Buffer);
-                SendData(buffer, NewClient);
+                SendData(PacketID.AllocatedPlayerID, new AllocatedPlayerIDPacket(NewPlayer.PlayerID).Buffer, NewClient);
 
                 // add new client to ClientList
                 ClientList.Add(NewPlayer.PlayerID, NewPlayer);
@@ -56,25 +54,38 @@ namespace MabinogiMobileServer
                     if (item.Key != NewPlayer.PlayerID)
                     {
                         packet = new TransformPacket(item.Value.PlayerID, item.Value.Transform);
-                        SendData(PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(PacketID.Transform), packet.Buffer), NewClient);
+                        SendData(PacketID.Transform, packet.Buffer, NewClient);
                     }
                 }
 
                 // broadcast packet that new client connected
                 packet = new TransformPacket(NewPlayer.PlayerID, NewPlayer.Transform);
-                Broadcast(PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(PacketID.Transform), packet.Buffer), NewPlayer.PlayerID);
+                Broadcast(PacketID.Transform, packet.Buffer, NewPlayer.PlayerID);
             }
         }
 
-        public IPacket? ReadData(PacketID packetID, Socket socket)
+        public IPacket? ReadData(out PacketID ID, Socket socket)
         {
             IPacket? packet = null;
+            ID = PacketID.Unknown;
 
             if ((socket.Available > 0) is false)
                 return packet;
 
+            // read header
+            using (NetworkStream ns = new NetworkStream(socket))
+            {
+                byte[] header = new byte[PacketHeader.HeaderSize];
+                int ReadLen = 0;
+                while (ReadLen < header.Length)
+                {
+                    ReadLen += ns.Read(header, ReadLen, PacketHeader.HeaderSize - ReadLen);
+                }
+                ID = PacketHeader.DeserializePacketHeader(header);
+            }
+
             byte[] buffer;
-            if (packetID is PacketID.AllocatedPlayerID)
+            if (ID is PacketID.AllocatedPlayerID)
             {
                 buffer = new byte[AllocatedPlayerIDPacket.PacketSize];
                 using (NetworkStream ns = new NetworkStream(socket))
@@ -85,7 +96,7 @@ namespace MabinogiMobileServer
                 packet = new AllocatedPlayerIDPacket(buffer);
             }
 
-            if (packetID is PacketID.Transform)
+            if (ID is PacketID.Transform)
             {
                 buffer = new byte[TransformPacket.PacketSize];
                 using (NetworkStream ns = new NetworkStream(socket))
@@ -96,24 +107,36 @@ namespace MabinogiMobileServer
                 packet = new TransformPacket(buffer);
             }
 
+            if (ID is PacketID.Attack)
+            {
+                buffer = new byte[AttackPacket.PacketSize];
+                using (NetworkStream ns = new NetworkStream(socket))
+                {
+                    ns.ReadExactly(buffer, 0, buffer.Length);
+                }
+
+                packet = new AttackPacket(buffer);
+            }
+
             return packet;
         }
 
-        public void SendData(byte[] Buffer, Socket client)
+        public void SendData(PacketID ID, byte[] Buffer, Socket client)
         {
+            byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(ID), Buffer);
             using (NetworkStream ns = new NetworkStream(client))
             {
-                ns.Write(Buffer, 0, Buffer.Length);
+                ns.Write(packet, 0, packet.Length);
             }
         }
 
-        public void Broadcast(byte[] Buffer, int? ExcludeID = null)
+        public void Broadcast(PacketID ID, byte[] Buffer, int? ExcludeID = null)
         {
             foreach(var item in ClientList)
             {
                 if(ExcludeID is null || (ExcludeID is not null && item.Key != ExcludeID))
                 {
-                    SendData(Buffer, item.Value.sock);
+                    SendData(ID, Buffer, item.Value.sock);
                 }
             }
         }

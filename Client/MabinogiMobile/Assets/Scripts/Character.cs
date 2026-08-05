@@ -12,7 +12,7 @@ public class Character : MonoBehaviour
 
     public bool IsLocal = false;
     public int PlayerID = 0;
-    public event Action<byte[]> SendEvent = delegate (byte[] b) { };
+    public event Action<PacketID, byte[]> SendEvent = delegate (PacketID a, byte[] b) { };
 
     Animator CharacterAnimator = null!;
 
@@ -78,7 +78,7 @@ public class Character : MonoBehaviour
         }
 
         if (IsControl is true)
-            SendEvent(ConvertTransformToByteArray(transform));
+            SendEvent(PacketID.Transform, ConvertTransformToByteArray(transform));
     }
 
     private void AttackOther()
@@ -86,7 +86,7 @@ public class Character : MonoBehaviour
         if (AttackAction != null && AttackAction.IsPressed() is true)
         {
             CharacterAnimator.SetTrigger("AttackTrigger");
-            SendEvent(BitConverter.GetBytes(PlayerID));
+            SendEvent(PacketID.Attack, BitConverter.GetBytes(PlayerID));
         }
     }
 

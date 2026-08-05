@@ -17,20 +17,30 @@ namespace MabinogiMobileServer
                 // read data
                 foreach (var item in NetworkManager.NetworkManagerInstance.ClientList)
                 {
-                    IPacket? ReceivePacket = NetworkManager.NetworkManagerInstance.ReadData(packetID: PacketID.Transform, socket: item.Value.sock);
+                    PacketID ID = PacketID.Unknown;
+                    IPacket? ReceivePacket = NetworkManager.NetworkManagerInstance.ReadData(ID: out ID, socket: item.Value.sock);
+
                     if (ReceivePacket is not null)
                     {
-                        TransformPacket? packet = (TransformPacket)ReceivePacket;
-                        if (packet is not null)
+                        // process transform packet
+                        if (ReceivePacket is TransformPacket)
                         {
+                            TransformPacket transformPacket = (TransformPacket)ReceivePacket;
                             foreach (var client in NetworkManager.NetworkManagerInstance.ClientList)
-                                if (client.Key == packet.PlayerID)
+                                if (client.Key == transformPacket.PlayerID)
                                 {
-                                    client.Value.Transform = packet.Transform;
+                                    client.Value.Transform = transformPacket.Transform;
                                     break;
                                 }
 
-                            NetworkManager.NetworkManagerInstance.Broadcast(packet.Buffer, packet.PlayerID);
+                            NetworkManager.NetworkManagerInstance.Broadcast(PacketID.Transform, transformPacket.Buffer, transformPacket.PlayerID);
+                        }
+
+                        // process attack packet
+                        if (ReceivePacket is AttackPacket)
+                        {
+                            AttackPacket attackPacket = (AttackPacket)ReceivePacket;
+                            NetworkManager.NetworkManagerInstance.Broadcast(PacketID.Transform, attackPacket.Buffer, attackPacket.PlayerID);
                         }
                     }
                 }
