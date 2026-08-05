@@ -30,11 +30,13 @@ public class Network : MonoBehaviour, IDisposable
             // create local player
             if(CharacterSpawner != null)
             {
+                PacketID id = PacketID.Unknown;
+
                 // get allocated PlayerID
                 IPacket? AllocatedPacket = null;
                 while(AllocatedPacket is null)
                 {
-                    AllocatedPacket = ReadData(packetID: PacketID.AllocatedPlayerID);
+                    AllocatedPacket = ReadData(out id);
                 }
                 AllocatedPlayerIDPacket packet = (AllocatedPlayerIDPacket)AllocatedPacket;
                 if (packet is not null)
@@ -48,7 +50,7 @@ public class Network : MonoBehaviour, IDisposable
                 // create remote player
                 while (true)
                 {
-                    IPacket? OtherClientPacket = ReadData(packetID: PacketID.Transform);
+                    IPacket? OtherClientPacket = ReadData(out id);
                     if (OtherClientPacket is null)
                         break;
 
@@ -73,31 +75,52 @@ public class Network : MonoBehaviour, IDisposable
     {
         while(true)
         {
-            IPacket? RecievePacket = ReadData(packetID: PacketID.Transform);
+            PacketID id = PacketID.Unknown;
+            IPacket? RecievePacket = ReadData(out id);
             if (RecievePacket is null)
                 break;
 
-            TransformPacket packet = (TransformPacket)RecievePacket;
-            if (packet is null)
-            {
-                break;
-            }
-
-            if (Players.ContainsKey(packet.PlayerID) is false)
-            {
-                // create new client
-                Vector3 pos = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
-                Quaternion rot = new Quaternion(packet.Rotation[0], packet.Rotation[1], packet.Rotation[2], packet.Rotation[3]);
-                Spawner s = CharacterSpawner.GetComponent<Spawner>();
-                Players.Add(packet.PlayerID, (GameObject)s.SpawnOther(pos, rot));
-                Debug.Log($"[my ID {ID}, update()] : create player {packet.PlayerID}");
-            }
-
-            // move remote player
-            Character c = Players[packet.PlayerID].GetComponent<Character>();
-            if (c is not null)
-                c.MoveCharacter(packet);
+            if (id is PacketID.Transform)
+                ProcessTransformPacket((TransformPacket)RecievePacket);
+            else if (id is PacketID.Attack)
+                ProcessAttackPacket((AttackPacket)RecievePacket);
         }
+    }
+
+    private void ProcessAttackPacket(AttackPacket packet)
+    {
+        if (packet is null)
+        {
+            return;
+        }
+
+        // output attack animation to remote player
+        Character c = Players[packet.PlayerID].GetComponent<Character>();
+        if (c is not null)
+            c.OutputAttackAnimation();
+    }
+
+    private void ProcessTransformPacket(TransformPacket packet)
+    {
+        if (packet is null)
+        {
+            return;
+        }
+
+        if (Players.ContainsKey(packet.PlayerID) is false)
+        {
+            // create new client
+            Vector3 pos = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
+            Quaternion rot = new Quaternion(packet.Rotation[0], packet.Rotation[1], packet.Rotation[2], packet.Rotation[3]);
+            Spawner s = CharacterSpawner.GetComponent<Spawner>();
+            Players.Add(packet.PlayerID, (GameObject)s.SpawnOther(pos, rot));
+            Debug.Log($"[my ID {ID}, update()] : create player {packet.PlayerID}");
+        }
+
+        // move remote player
+        Character c = Players[packet.PlayerID].GetComponent<Character>();
+        if (c is not null)
+            c.MoveCharacter(packet);
     }
 
     public void Dispose()
@@ -113,18 +136,35 @@ public class Network : MonoBehaviour, IDisposable
         }
     }
 
-    public IPacket? ReadData(PacketID packetID)
+    public IPacket? ReadData(out PacketID packetID)
     {
         IPacket? packet = null;
+        packetID = PacketID.Unknown;
         if (socket.Available <= 0)
+        {
             return packet;
+        }
+
+        // check header
+        using (NetworkStream ns = new NetworkStream(socket))
+        {
+            byte[] header = new byte[PacketHeader.HeaderSize];
+            int ReadLen = 0;
+            while (ReadLen < header.Length)
+            {
+                ReadLen += ns.Read(header, ReadLen, PacketHeader.HeaderSize - ReadLen);
+            }
+            packetID = PacketHeader.DeserializePacketHeader(header);
+        }
 
         if(packetID == PacketID.AllocatedPlayerID)
         {
             byte[] buffer = new byte[AllocatedPlayerIDPacket.PacketSize];
             using (NetworkStream ns = new NetworkStream(socket))
             {
-                ns.Read(buffer, 0, buffer.Length);
+                int ReadLen = 0;
+                while (ReadLen < buffer.Length)
+                    ReadLen += ns.Read(buffer, ReadLen, buffer.Length - ReadLen);
             }
 
             packet = new AllocatedPlayerIDPacket(buffer);
@@ -135,10 +175,25 @@ public class Network : MonoBehaviour, IDisposable
             byte[] buffer = new byte[TransformPacket.PacketSize];
             using (NetworkStream ns = new NetworkStream(socket))
             {
-                ns.Read(buffer, 0, buffer.Length);
+                int ReadLen = 0;
+                while (ReadLen < buffer.Length)
+                    ReadLen += ns.Read(buffer, ReadLen, buffer.Length - ReadLen);
             }
 
             packet = new TransformPacket(buffer);
+        }
+
+        if (packetID == PacketID.Attack)
+        {
+            byte[] buffer = new byte[AttackPacket.PacketSize];
+            using (NetworkStream ns = new NetworkStream(socket))
+            {
+                int ReadLen = 0;
+                while (ReadLen < buffer.Length)
+                    ReadLen += ns.Read(buffer, ReadLen, buffer.Length - ReadLen);
+            }
+
+            packet = new AttackPacket(buffer);
         }
 
         return packet;

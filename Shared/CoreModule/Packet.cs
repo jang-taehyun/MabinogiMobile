@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net.Sockets;
 
 namespace CoreModule
 {
@@ -8,8 +9,50 @@ namespace CoreModule
 
         AllocatedPlayerID,
         Transform,
+        Attack,
 
         Max
+    }
+
+    public class PacketHeader
+    {
+        public static int HeaderSize
+        {
+            get
+            {
+                return sizeof(PacketID);
+            }
+        }
+
+        public PacketID ID { get; set; }
+
+        public static byte[] SerializePacketHeader(PacketID id)
+        {
+            return BitConverter.GetBytes((int)id);
+        }
+
+        public static PacketID DeserializePacketHeader(byte[] buffer)
+        {
+            byte[] PacketHeaderBuf = new byte[PacketHeader.HeaderSize];
+            Array.Copy(buffer, PacketHeaderBuf, PacketHeader.HeaderSize);
+            return (PacketID)BitConverter.ToInt32(PacketHeaderBuf, 0);
+        }
+
+        public static void SplitPacket(byte[] packet, out byte[] header, out byte[] data)
+        {
+            header = new byte[PacketHeader.HeaderSize];
+            data = new byte[packet.Length - PacketHeader.HeaderSize];
+            Array.Copy(packet, header, PacketHeader.HeaderSize);
+            Array.Copy(packet, PacketHeader.HeaderSize, data, 0, packet.Length - PacketHeader.HeaderSize);
+        }
+
+        public static byte[] AppendPacket(byte[] header, byte[] data)
+        {
+            byte[] packet = new byte[header.Length + data.Length];
+            Array.Copy(header, 0, packet, 0, header.Length);
+            Array.Copy(data, 0, packet, header.Length, data.Length);
+            return packet;
+        }
     }
 
     public interface IPacket
@@ -20,10 +63,16 @@ namespace CoreModule
 
     public class AllocatedPlayerIDPacket : IPacket
     {
-        public static int PacketSize = 4;
+        public static int PacketSize
+        {
+            get
+            {
+                return sizeof(int);
+            }
+        }
+
         public int PlayerID { get; private set; } = 0;
         public byte[] Buffer { get; private set; } = null!;
-        private bool IsDone = false;
 
         public AllocatedPlayerIDPacket(int PlayerID)
         {
@@ -37,34 +86,32 @@ namespace CoreModule
             DeserializePacket();
         }
 
-        public void DeserializePacket()
-        {
-            if (IsDone is false)
-            {
-                PlayerID = BitConverter.ToInt32(Buffer, 0);
-                IsDone = true;
-            }
-        }
-
         public byte[] SerializePacket()
         {
-            if (IsDone is false)
+            if (Buffer is null)
             {
-                Buffer = BitConverter.GetBytes(PlayerID);
-                IsDone = true;
+                Buffer = new byte[PacketSize];
+
+                byte[] SerializeResult = BitConverter.GetBytes(PlayerID);
+                Array.Copy(SerializeResult, Buffer, PacketSize);
             }
 
             return Buffer;
+        }
+
+        public void DeserializePacket()
+        {
+            if (PlayerID is 0)
+            {
+                PlayerID = BitConverter.ToInt32(Buffer, 0);
+            }
         }
     }
 
     public class TransformPacket : IPacket
     {
-        public static int PacketSize = 4 + (10 * 4);
-
-        public int PlayerID { get; private set; }
-
-        public float[] Transform { get; private set; } = new float[10];
+        public int PlayerID { get; private set; } = 0;
+        public float[] Transform { get; private set; } = null!;
         public float[] Position
         {
             get
@@ -98,7 +145,13 @@ namespace CoreModule
 
         public byte[] Buffer { get; private set; } = null!;
 
-        private bool IsDone = false;
+        public static int PacketSize
+        {
+            get
+            {
+                return sizeof(int) + sizeof(float) * 10;
+            }
+        }
 
         public TransformPacket(byte[] buffer)
         {
@@ -115,49 +168,89 @@ namespace CoreModule
 
         public void DeserializePacket()
         {
-            if (IsDone is false)
+            if (PlayerID is 0)
             {
+                Transform = new float[10];
                 byte[] data = new byte[4];
-                int NextOffset = 0;
+                int Offset = 0;
 
                 // deserialize Player ID
-                Array.Copy(Buffer, NextOffset, data, 0, 4);
+                Array.Copy(Buffer, Offset, data, 0, 4);
                 PlayerID = BitConverter.ToInt32(data);
-                NextOffset += data.Length;
+                Offset += data.Length;
 
                 // deserialize Transform
                 for (int i = 0; i < 10; ++i)
                 {
-                    Array.Copy(Buffer, NextOffset, data, 0, 4);
+                    Array.Copy(Buffer, Offset, data, 0, 4);
                     Transform[i] = BitConverter.ToSingle(data);
-                    NextOffset += data.Length;
+                    Offset += data.Length;
                 }
-
-                IsDone = true;
             }
         }
 
         public byte[] SerializePacket()
         {
-            if (IsDone is false)
+            if (Buffer is null)
             {
-                byte[] buffer = new byte[PacketSize];
+                Buffer = new byte[PacketSize];
 
                 // serialize Player ID
                 byte[] SerializeResult = BitConverter.GetBytes(PlayerID);
-                Array.Copy(SerializeResult, 0, buffer, 0, SerializeResult.Length);
-                int NextOffset = SerializeResult.Length;
+                Array.Copy(SerializeResult, 0, Buffer, 0, SerializeResult.Length);
+                int Offset = SerializeResult.Length;
 
                 // serialize transform
                 for (int i = 0; i < Transform.Length; ++i)
                 {
                     SerializeResult = BitConverter.GetBytes(Transform[i]);
-                    Array.Copy(SerializeResult, 0, buffer, NextOffset, SerializeResult.Length);
-                    NextOffset += SerializeResult.Length;
+                    Array.Copy(SerializeResult, 0, Buffer, Offset, SerializeResult.Length);
+                    Offset += SerializeResult.Length;
                 }
+            }
 
-                IsDone = true;
-                Buffer = buffer;
+            return Buffer;
+        }
+    }
+
+    public class AttackPacket : IPacket
+    {
+        public static int PacketSize
+        {
+            get
+            {
+                return sizeof(int);
+            }
+        }
+
+        public int PlayerID { get; private set; } = 0;
+        public byte[] Buffer { get; private set; } = null!;
+
+        public AttackPacket(byte[] buffer)
+        {
+            this.Buffer = buffer;
+            DeserializePacket();
+        }
+
+        public AttackPacket(int PlayerID)
+        {
+            this.PlayerID = PlayerID;
+            SerializePacket();
+        }
+
+        public void DeserializePacket()
+        {
+            if (PlayerID is 0)
+            {
+                PlayerID = BitConverter.ToInt32(Buffer, 0);
+            }
+        }
+
+        public byte[] SerializePacket()
+        {
+            if (Buffer is null)
+            {
+                Buffer = BitConverter.GetBytes(PlayerID);
             }
 
             return Buffer;

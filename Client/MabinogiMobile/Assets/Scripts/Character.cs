@@ -19,6 +19,7 @@ public class Character : MonoBehaviour
     InputAction? MoveAction = null;
     InputAction? LeftRotateAction = null;
     InputAction? RightRotateAction = null;
+    InputAction? AttackAction = null;
 
     private void Start()
     {
@@ -41,6 +42,7 @@ public class Character : MonoBehaviour
         if (IsLocal is true)
         {
             ControlCharacter();
+            AttackOther();
         }
     }
 
@@ -79,12 +81,12 @@ public class Character : MonoBehaviour
             SendEvent(ConvertTransformToByteArray(transform));
     }
 
-    public void SetCharacterColor(Color color)
+    private void AttackOther()
     {
-        Renderer renderer = GetComponent<Renderer>();
-        if (renderer is not null)
+        if (AttackAction != null && AttackAction.IsPressed() is true)
         {
-            renderer.material.SetColor("_BaseColor", color);
+            CharacterAnimator.SetTrigger("AttackTrigger");
+            SendEvent(BitConverter.GetBytes(PlayerID));
         }
     }
 
@@ -107,12 +109,21 @@ public class Character : MonoBehaviour
         RightRotateAction = InputComponent.actions.FindAction("CharacterControl/RightRotate");
         if (RightRotateAction == null)
             throw new MobinogiException("right rotate action not find");
+
+        AttackAction = InputComponent.actions.FindAction("CharacterControl/Attack");
+        if (RightRotateAction == null)
+            throw new MobinogiException("attack action not find");
     }
 
     public void MoveCharacter(TransformPacket packet)
     {
         transform.position = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
         transform.rotation = new Quaternion(packet.Rotation[0], packet.Rotation[1], packet.Rotation[2], packet.Rotation[3]);
+    }
+
+    public void OutputAttackAnimation()
+    {
+        CharacterAnimator.SetTrigger("AttackTrigger");
     }
 
     private byte[] ConvertTransformToByteArray(Transform transform)

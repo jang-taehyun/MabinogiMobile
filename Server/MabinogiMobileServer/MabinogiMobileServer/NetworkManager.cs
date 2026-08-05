@@ -41,7 +41,9 @@ namespace MabinogiMobileServer
                 {
                     NewPlayer.PlayerID = new Random().Next(1, 100);
                 } while (ClientList.ContainsKey(NewPlayer.PlayerID) is true);
-                SendData(new AllocatedPlayerIDPacket(NewPlayer.PlayerID).Buffer, NewClient);
+
+                byte[] buffer = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(PacketID.AllocatedPlayerID), new AllocatedPlayerIDPacket(NewPlayer.PlayerID).Buffer);
+                SendData(buffer, NewClient);
 
                 // add new client to ClientList
                 ClientList.Add(NewPlayer.PlayerID, NewPlayer);
@@ -54,13 +56,13 @@ namespace MabinogiMobileServer
                     if (item.Key != NewPlayer.PlayerID)
                     {
                         packet = new TransformPacket(item.Value.PlayerID, item.Value.Transform);
-                        SendData(packet.Buffer, NewClient);
+                        SendData(PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(PacketID.Transform), packet.Buffer), NewClient);
                     }
                 }
 
                 // broadcast packet that new client connected
                 packet = new TransformPacket(NewPlayer.PlayerID, NewPlayer.Transform);
-                Broadcast(packet.Buffer, NewPlayer.PlayerID);
+                Broadcast(PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(PacketID.Transform), packet.Buffer), NewPlayer.PlayerID);
             }
         }
 
@@ -96,34 +98,6 @@ namespace MabinogiMobileServer
 
             return packet;
         }
-
-        //public byte[] SerializeData(int PlayerID, float Data)
-        //{
-        //    byte[] buffer = new byte[8];
-
-        //    // serialize player ID
-        //    byte[] SerializeResult = BitConverter.GetBytes(PlayerID);
-        //    Array.Copy(SerializeResult, 0, buffer, 0, SerializeResult.Length);
-
-        //    // serialize data
-        //    SerializeResult = BitConverter.GetBytes(Data);
-        //    Array.Copy(SerializeResult, 0, buffer, 4, SerializeResult.Length);
-
-        //    return buffer;
-        //}
-
-        //public void DeserializeData(byte[] buffer, out int PlayerID, out float Data)
-        //{
-        //    byte[] DeserializeResult = new byte[4];
-
-        //    // deserialize player ID
-        //    Array.Copy(buffer, 0, DeserializeResult, 0, 4);
-        //    PlayerID = BitConverter.ToInt32(DeserializeResult);
-
-        //    // deserialize data
-        //    Array.Copy(buffer, 4, DeserializeResult, 0, 4);
-        //    Data = BitConverter.ToSingle(DeserializeResult);
-        //}
 
         public void SendData(byte[] Buffer, Socket client)
         {
