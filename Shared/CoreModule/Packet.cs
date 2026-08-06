@@ -10,6 +10,7 @@ namespace CoreModule
         AllocatedPlayerID,
         Transform,
         Attack,
+        CloseClient,
 
         Max
     }
@@ -213,47 +214,15 @@ namespace CoreModule
         }
     }
 
-    public class AttackPacket : IPacket
+    public class AttackPacket : AllocatedPlayerIDPacket
     {
-        public static int PacketSize
-        {
-            get
-            {
-                return sizeof(int);
-            }
-        }
+        public AttackPacket(int PlayerID) : base(PlayerID) { }
+        public AttackPacket(byte[] Buffer) : base(Buffer) { }
+    }
 
-        public int PlayerID { get; private set; } = 0;
-        public byte[] Buffer { get; private set; } = null!;
-
-        public AttackPacket(byte[] buffer)
-        {
-            this.Buffer = buffer;
-            DeserializePacket();
-        }
-
-        public AttackPacket(int PlayerID)
-        {
-            this.PlayerID = PlayerID;
-            SerializePacket();
-        }
-
-        public void DeserializePacket()
-        {
-            if (PlayerID is 0)
-            {
-                PlayerID = BitConverter.ToInt32(Buffer, 0);
-            }
-        }
-
-        public byte[] SerializePacket()
-        {
-            if (Buffer is null)
-            {
-                Buffer = BitConverter.GetBytes(PlayerID);
-            }
-
-            return Buffer;
-        }
+    public class CloseClientPacket : AllocatedPlayerIDPacket
+    {
+        public CloseClientPacket(int PlayerID) : base(PlayerID) { }
+        public CloseClientPacket(byte[] Buffer) : base(Buffer) { }
     }
 }

@@ -18,7 +18,7 @@ namespace MabinogiMobileServer
                 foreach (var item in NetworkManager.NetworkManagerInstance.ClientList)
                 {
                     PacketID ID = PacketID.Unknown;
-                    IPacket? ReceivePacket = NetworkManager.NetworkManagerInstance.ReadData(ID: out ID, socket: item.Value.sock);
+                    IPacket? ReceivePacket = NetworkManager.NetworkManagerInstance.ReadData(ID: out ID, item.Value);
 
                     if (ReceivePacket is not null)
                     {
@@ -43,6 +43,9 @@ namespace MabinogiMobileServer
                             NetworkManager.NetworkManagerInstance.Broadcast(PacketID.Attack, attackPacket.Buffer, attackPacket.PlayerID);
                         }
                     }
+
+                    // close client
+                    NetworkManager.NetworkManagerInstance.CloseClientSocket();
                 }
                 
             }

@@ -85,6 +85,8 @@ public class Network : MonoBehaviour, IDisposable
                 ProcessTransformPacket((TransformPacket)RecievePacket);
             else if (id is PacketID.Attack)
                 ProcessAttackPacket((AttackPacket)RecievePacket);
+            else if (id is PacketID.CloseClient)
+                ProcessCloseClientPacket((CloseClientPacket)RecievePacket);
         }
     }
 
@@ -124,8 +126,21 @@ public class Network : MonoBehaviour, IDisposable
             c.MoveCharacter(packet);
     }
 
+    private void ProcessCloseClientPacket(CloseClientPacket packet)
+    {
+        if (packet is null)
+        {
+            return;
+        }
+
+        Destroy(Players[packet.PlayerID]);
+        Players.Remove(packet.PlayerID);
+        Debug.Log($"[my ID {ID}, update()] : remove player {packet.PlayerID}");
+    }
+
     public void Dispose()
     {
+        socket?.Shutdown(SocketShutdown.Both);
         socket?.Close();
     }
 
@@ -196,6 +211,19 @@ public class Network : MonoBehaviour, IDisposable
             }
 
             packet = new AttackPacket(buffer);
+        }
+
+        if (packetID == PacketID.CloseClient)
+        {
+            byte[] buffer = new byte[CloseClientPacket.PacketSize];
+            using (NetworkStream ns = new NetworkStream(socket))
+            {
+                int ReadLen = 0;
+                while (ReadLen < buffer.Length)
+                    ReadLen += ns.Read(buffer, ReadLen, buffer.Length - ReadLen);
+            }
+
+            packet = new CloseClientPacket(buffer);
         }
 
         return packet;

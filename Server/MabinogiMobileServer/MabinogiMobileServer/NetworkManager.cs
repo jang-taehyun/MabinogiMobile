@@ -22,6 +22,7 @@ namespace MabinogiMobileServer
 
         Listener listener = Listener.Instance;
         public Dictionary<int, Player> ClientList { get; private set; } = new Dictionary<int, Player>();
+        public List<Player> CloseClientList { get; private set; } = new List<Player>();
 
         private NetworkManager() { }
 
@@ -64,16 +65,24 @@ namespace MabinogiMobileServer
             }
         }
 
-        public IPacket? ReadData(out PacketID ID, Socket socket)
+        public IPacket? ReadData(out PacketID ID, Player player)
         {
             IPacket? packet = null;
             ID = PacketID.Unknown;
 
-            if ((socket.Available > 0) is false)
+            // close client
+            if (player.sock.Poll(0, SelectMode.SelectRead) == true && player.sock.Available == 0)
+            {
+                CloseClientList.Add(player);
+                return packet;
+            }
+
+            // no data to read
+            if ((player.sock.Available > 0) is false)
                 return packet;
 
             // read header
-            using (NetworkStream ns = new NetworkStream(socket))
+            using (NetworkStream ns = new NetworkStream(player.sock))
             {
                 byte[] header = new byte[PacketHeader.HeaderSize];
                 int ReadLen = 0;
@@ -88,7 +97,7 @@ namespace MabinogiMobileServer
             if (ID is PacketID.AllocatedPlayerID)
             {
                 buffer = new byte[AllocatedPlayerIDPacket.PacketSize];
-                using (NetworkStream ns = new NetworkStream(socket))
+                using (NetworkStream ns = new NetworkStream(player.sock))
                 {
                     ns.ReadExactly(buffer, 0, buffer.Length);
                 }
@@ -99,7 +108,7 @@ namespace MabinogiMobileServer
             if (ID is PacketID.Transform)
             {
                 buffer = new byte[TransformPacket.PacketSize];
-                using (NetworkStream ns = new NetworkStream(socket))
+                using (NetworkStream ns = new NetworkStream(player.sock))
                 {
                     ns.ReadExactly(buffer, 0, buffer.Length);
                 }
@@ -110,7 +119,7 @@ namespace MabinogiMobileServer
             if (ID is PacketID.Attack)
             {
                 buffer = new byte[AttackPacket.PacketSize];
-                using (NetworkStream ns = new NetworkStream(socket))
+                using (NetworkStream ns = new NetworkStream(player.sock))
                 {
                     ns.ReadExactly(buffer, 0, buffer.Length);
                 }
@@ -138,6 +147,22 @@ namespace MabinogiMobileServer
                 {
                     SendData(ID, Buffer, item.Value.sock);
                 }
+            }
+        }
+
+        public void CloseClientSocket()
+        {
+            while (CloseClientList.Count > 0)
+            {
+                int ClosePlayerID = CloseClientList[0].PlayerID;
+                Console.WriteLine($"[close client] : {CloseClientList[0].PlayerID}");
+
+                ClientList.Remove(CloseClientList[0].PlayerID);
+                CloseClientList[0].sock.Shutdown(SocketShutdown.Both);
+                CloseClientList[0].sock.Close();
+                CloseClientList.RemoveAt(0);
+
+                Broadcast(PacketID.CloseClient, new CloseClientPacket(ClosePlayerID).Buffer);
             }
         }
 
