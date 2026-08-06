@@ -40,7 +40,7 @@ namespace MabinogiMobileServer
                         if (ReceivePacket is AttackPacket)
                         {
                             AttackPacket attackPacket = (AttackPacket)ReceivePacket;
-                            NetworkManager.NetworkManagerInstance.Broadcast(PacketID.Transform, attackPacket.Buffer, attackPacket.PlayerID);
+                            NetworkManager.NetworkManagerInstance.Broadcast(PacketID.Attack, attackPacket.Buffer, attackPacket.PlayerID);
                         }
                     }
                 }
