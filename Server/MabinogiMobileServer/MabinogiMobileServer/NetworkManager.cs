@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Numerics;
 
 namespace MabinogiMobileServer
 {
@@ -26,15 +25,6 @@ namespace MabinogiMobileServer
         public Dictionary<int, Player> ClientList { get; private set; } = new Dictionary<int, Player>();
         public Queue<Player> CloseClientQueue { get; private set; } = new Queue<Player>();
 
-        // todo : if you add packet, register PacketObjectGenerator
-        public readonly Dictionary<PacketID, Func<Socket, IPacket>> PacketObjectGenerator = new Dictionary<PacketID, Func<Socket, IPacket>>()
-        {
-            { PacketID.AllocatedPlayerID,   (Socket sock) => new AllocatedPlayerIDPacket(ReadData(sock, AllocatedPlayerIDPacket.PacketSize))    },
-            { PacketID.Transform,           (Socket sock) => new TransformPacket(ReadData(sock, TransformPacket.PacketSize))                    },
-            { PacketID.Attack,              (Socket sock) => new AttackPacket(ReadData(sock, AttackPacket.PacketSize))                          },
-            { PacketID.CloseClient,         (Socket sock) => new CloseClientPacket(ReadData(sock, CloseClientPacket.PacketSize))                },
-        };
-
         public void RunServer() => listener.Run();
 
         public void AcceptClient()
@@ -42,7 +32,7 @@ namespace MabinogiMobileServer
             Socket? NewClient = listener.AcceptClient();
             if (NewClient is not null)
             {
-                // allocate client ID to New client
+                // allocate player ID to New client
                 Player NewPlayer = new Player()
                 { 
                     sock = NewClient
@@ -58,19 +48,18 @@ namespace MabinogiMobileServer
                 Console.WriteLine($"New Client connected : {NewPlayer.PlayerID}");
 
                 // send client list info to New client
-                TransformPacket packet;
                 foreach (var item in ClientList)
                 {
                     if (item.Key != NewPlayer.PlayerID)
                     {
-                        packet = new TransformPacket(item.Value.PlayerID, item.Value.Transform);
-                        SendPacket(PacketID.Transform, packet.Buffer, NewClient);
+                        TransformPacket OtherPlayerInfoPacket = new TransformPacket(item.Value.PlayerID, item.Value.Transform);
+                        SendPacket(PacketID.Transform, OtherPlayerInfoPacket.Buffer, NewClient);
                     }
                 }
 
                 // broadcast packet that new client connected
-                packet = new TransformPacket(NewPlayer.PlayerID, NewPlayer.Transform);
-                Broadcast(PacketID.Transform, packet.Buffer, NewPlayer.PlayerID);
+                TransformPacket NewPlayerInfoPacket = new TransformPacket(NewPlayer.PlayerID, NewPlayer.Transform);
+                Broadcast(PacketID.Transform, NewPlayerInfoPacket.Buffer, NewPlayer.PlayerID);
             }
         }
 
@@ -103,7 +92,7 @@ namespace MabinogiMobileServer
             }
 
             // read data
-            return PacketObjectGenerator[ID].Invoke(player.sock);
+            return PacketHandler.generator[ID].Invoke(player.sock);
         }
 
         public void SendPacket(PacketID ID, byte[] Buffer, Socket client)
@@ -126,7 +115,7 @@ namespace MabinogiMobileServer
             }
         }
 
-        private static byte[] ReadData(Socket socket, int PacketSize)
+        public static byte[] ReadData(Socket socket, int PacketSize)
         {
             byte[] buffer = new byte[PacketSize];
             using (NetworkStream ns = new NetworkStream(socket))
@@ -158,7 +147,6 @@ namespace MabinogiMobileServer
             foreach (var item in ClientList)
                 item.Value.sock.Close();
         }
-
 
         // Listener class
         private class Listener : IDisposable

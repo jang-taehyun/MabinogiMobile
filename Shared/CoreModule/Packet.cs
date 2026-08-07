@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Net.Sockets;
 
 namespace CoreModule
 {
@@ -39,14 +38,6 @@ namespace CoreModule
             return (PacketID)BitConverter.ToInt32(PacketHeaderBuf, 0);
         }
 
-        public static void SplitPacket(byte[] packet, out byte[] header, out byte[] data)
-        {
-            header = new byte[PacketHeader.HeaderSize];
-            data = new byte[packet.Length - PacketHeader.HeaderSize];
-            Array.Copy(packet, header, PacketHeader.HeaderSize);
-            Array.Copy(packet, PacketHeader.HeaderSize, data, 0, packet.Length - PacketHeader.HeaderSize);
-        }
-
         public static byte[] AppendPacket(byte[] header, byte[] data)
         {
             byte[] packet = new byte[header.Length + data.Length];
@@ -58,6 +49,9 @@ namespace CoreModule
 
     public interface IPacket
     {
+        int PlayerID { get; }
+        byte[] Buffer { get; }
+
         byte[] SerializePacket();
         void DeserializePacket();
     }
@@ -154,9 +148,9 @@ namespace CoreModule
             }
         }
 
-        public TransformPacket(byte[] buffer)
+        public TransformPacket(byte[] Buffer)
         {
-            this.Buffer = buffer;
+            this.Buffer = Buffer;
             DeserializePacket();
         }
 

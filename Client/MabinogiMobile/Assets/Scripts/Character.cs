@@ -4,6 +4,7 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using CoreModule;
+using System.Linq;
 
 public class Character : MonoBehaviour
 {
@@ -78,7 +79,7 @@ public class Character : MonoBehaviour
         }
 
         if (IsControl is true)
-            SendEvent(PacketID.Transform, ConvertTransformToByteArray(transform));
+            SendEvent(PacketID.Transform, ConvertTransformToByteArray());
     }
 
     private void AttackOther()
@@ -126,7 +127,8 @@ public class Character : MonoBehaviour
         CharacterAnimator.SetTrigger("AttackTrigger");
     }
 
-    private byte[] ConvertTransformToByteArray(Transform transform)
+    [Obsolete("temp code", false)]
+    private byte[] ConvertTransformToByteArray()
     {
         float[] buffer = new float[10]
         {

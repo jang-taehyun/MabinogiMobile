@@ -23,24 +23,6 @@ public class NetworkManager : MonoBehaviour, IDisposable
     private const string ServerIP = "127.0.0.1";
     private const int ServerPort = 33355;
 
-    // todo : if you add packet, register PacketObjectGenerator
-    public readonly Dictionary<PacketID, Func<Socket, IPacket>> PacketObjectGenerator = new Dictionary<PacketID, Func<Socket, IPacket>>()
-    {
-        { PacketID.AllocatedPlayerID,   (Socket sock) => new AllocatedPlayerIDPacket(ReadData(sock, AllocatedPlayerIDPacket.PacketSize))    },
-        { PacketID.Transform,           (Socket sock) => new TransformPacket(ReadData(sock, TransformPacket.PacketSize))                    },
-        { PacketID.Attack,              (Socket sock) => new AttackPacket(ReadData(sock, AttackPacket.PacketSize))                          },
-        { PacketID.CloseClient,         (Socket sock) => new CloseClientPacket(ReadData(sock, CloseClientPacket.PacketSize))                },
-    };
-
-    // todo : if you add packet, register PacketObjectHandler
-    public readonly Dictionary<PacketID, Action<IPacket>> PacketObjectHandler = new Dictionary<PacketID, Action<IPacket>>()
-    {
-        { PacketID.AllocatedPlayerID,   PacketHandler.ProcessPacket<AllocatedPlayerIDPacketHandler> },
-        { PacketID.Transform,           PacketHandler.ProcessPacket<TransformPacketHandler>         },
-        { PacketID.Attack,              PacketHandler.ProcessPacket<AttackPacketHandler>            },
-        { PacketID.CloseClient,         PacketHandler.ProcessPacket<CloseClientPacketHandler>       },
-    };
-
     void Awake()
     {
         // connect server
@@ -55,7 +37,7 @@ public class NetworkManager : MonoBehaviour, IDisposable
         {
             packet = ReadPacket(out id);
         }
-        PacketObjectHandler[id].Invoke(packet);
+        PacketHandler.handler[id].Invoke(packet);
     }
 
     private void Update()
@@ -67,7 +49,7 @@ public class NetworkManager : MonoBehaviour, IDisposable
             if (packet is null)
                 break;
 
-            PacketObjectHandler[id].Invoke(packet);
+            PacketHandler.handler[id].Invoke(packet);
         }
     }
 
@@ -102,10 +84,10 @@ public class NetworkManager : MonoBehaviour, IDisposable
         }
 
         // read data
-        return PacketObjectGenerator[packetID].Invoke(socket);
+        return PacketHandler.generator[packetID].Invoke(socket);
     }
 
-    private static byte[] ReadData(Socket Socket, int PacketSize)
+    public static byte[] ReadData(Socket Socket, int PacketSize)
     {
         byte[] buffer = new byte[PacketSize];
         using (NetworkStream ns = new NetworkStream(Socket))

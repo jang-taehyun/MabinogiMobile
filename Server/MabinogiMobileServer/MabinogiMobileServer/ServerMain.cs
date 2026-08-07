@@ -1,5 +1,4 @@
 ﻿using CoreModule;
-using System;
 
 namespace MabinogiMobileServer
 {
@@ -14,35 +13,14 @@ namespace MabinogiMobileServer
                 // accept client
                 NetworkManager.NetworkManagerInstance.AcceptClient();
 
-                // read data
+                // process packet
                 foreach (var item in NetworkManager.NetworkManagerInstance.ClientList)
                 {
                     PacketID ID = PacketID.Unknown;
                     IPacket? ReceivePacket = NetworkManager.NetworkManagerInstance.ReadPacket(ID: out ID, item.Value);
 
                     if (ReceivePacket is not null)
-                    {
-                        // process transform packet
-                        if (ReceivePacket is TransformPacket)
-                        {
-                            TransformPacket transformPacket = (TransformPacket)ReceivePacket;
-                            foreach (var client in NetworkManager.NetworkManagerInstance.ClientList)
-                                if (client.Key == transformPacket.PlayerID)
-                                {
-                                    client.Value.Transform = transformPacket.Transform;
-                                    break;
-                                }
-
-                            NetworkManager.NetworkManagerInstance.Broadcast(PacketID.Transform, transformPacket.Buffer, transformPacket.PlayerID);
-                        }
-
-                        // process attack packet
-                        if (ReceivePacket is AttackPacket)
-                        {
-                            AttackPacket attackPacket = (AttackPacket)ReceivePacket;
-                            NetworkManager.NetworkManagerInstance.Broadcast(PacketID.Attack, attackPacket.Buffer, attackPacket.PlayerID);
-                        }
-                    }
+                        PacketHandler.handler[ID].Invoke(ReceivePacket);
                 }
 
                 // close client

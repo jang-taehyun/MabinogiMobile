@@ -1,47 +1,40 @@
 ﻿#nullable enable
 
 using CoreModule;
+using System;
+using System.Collections.Generic;
+using System.Net.Sockets;
 using UnityEngine;
 
-public interface IPacketHander
-{
-    void ProcessPacket(IPacket Packet);
-
-    public static T? CheckPacket<T>(IPacket packet) where T : class, IPacket
-    {
-        T? ret = null;
-        try
-        {
-            if (packet == null)
-                throw new MobinogiException("packet is null");
-            if (packet is not T)
-                throw new MobinogiException("packet is difference type");
-
-            ret = (T)packet;
-        }
-        catch(MobinogiException e)
-        {
-            e.OutputExceptionLog();
-        }
-
-        return ret;
-    }
-}
-
+// client packet handler //
 public class PacketHandler
 {
-    public static void ProcessPacket<T>(IPacket Packet) where T : class, IPacketHander, new()
+    // todo : if you add packet, register PacketObjectHandler
+    private static Dictionary<PacketID, Action<IPacket>> PacketObjectHandler { get; } = new Dictionary<PacketID, Action<IPacket>>()
     {
-        T handler = new T();
-        handler.ProcessPacket(Packet);
-    }
+        { PacketID.AllocatedPlayerID,   PacketHandlerInvoker.ProcessPacket<AllocatedPlayerIDPacketHandler> },
+        { PacketID.Transform,           PacketHandlerInvoker.ProcessPacket<TransformPacketHandler>         },
+        { PacketID.Attack,              PacketHandlerInvoker.ProcessPacket<AttackPacketHandler>            },
+        { PacketID.CloseClient,         PacketHandlerInvoker.ProcessPacket<CloseClientPacketHandler>       },
+    };
+    public static IReadOnlyDictionary<PacketID, Action<IPacket>> handler => PacketObjectHandler;
+
+    // todo : if you add packet, register PacketObjectGenerator
+    private static Dictionary<PacketID, Func<Socket, IPacket>> PacketObjectGenerator = new Dictionary<PacketID, Func<Socket, IPacket>>()
+    {
+        { PacketID.AllocatedPlayerID,   (Socket sock) => new AllocatedPlayerIDPacket(NetworkManager.ReadData(sock, AllocatedPlayerIDPacket.PacketSize))    },
+        { PacketID.Transform,           (Socket sock) => new TransformPacket(NetworkManager.ReadData(sock, TransformPacket.PacketSize))                    },
+        { PacketID.Attack,              (Socket sock) => new AttackPacket(NetworkManager.ReadData(sock, AttackPacket.PacketSize))                          },
+        { PacketID.CloseClient,         (Socket sock) => new CloseClientPacket(NetworkManager.ReadData(sock, CloseClientPacket.PacketSize))                },
+    };
+    public static IReadOnlyDictionary<PacketID, Func<Socket, IPacket>> generator => PacketObjectGenerator;
 }
 
-public class AllocatedPlayerIDPacketHandler : IPacketHander
+public class AllocatedPlayerIDPacketHandler : IPacketHandler
 {
     public void ProcessPacket(IPacket Packet)
     {
-        AllocatedPlayerIDPacket? packet = IPacketHander.CheckPacket<AllocatedPlayerIDPacket>(Packet);
+        AllocatedPlayerIDPacket? packet = IPacketHandler.CheckPacket<AllocatedPlayerIDPacket>(Packet);
         if (packet == null)
             return;
 
@@ -49,11 +42,11 @@ public class AllocatedPlayerIDPacketHandler : IPacketHander
     }
 }
 
-public class TransformPacketHandler : IPacketHander
+public class TransformPacketHandler : IPacketHandler
 {
     public void ProcessPacket(IPacket Packet)
     {
-        TransformPacket? packet = IPacketHander.CheckPacket<TransformPacket>(Packet);
+        TransformPacket? packet = IPacketHandler.CheckPacket<TransformPacket>(Packet);
         if (packet == null)
             return;
 
@@ -74,11 +67,11 @@ public class TransformPacketHandler : IPacketHander
     }
 }
 
-public class AttackPacketHandler : IPacketHander
+public class AttackPacketHandler : IPacketHandler
 {
     public void ProcessPacket(IPacket Packet)
     {
-        AttackPacket? packet = IPacketHander.CheckPacket<AttackPacket>(Packet);
+        AttackPacket? packet = IPacketHandler.CheckPacket<AttackPacket>(Packet);
         if (packet == null)
             return;
 
@@ -89,11 +82,11 @@ public class AttackPacketHandler : IPacketHander
     }
 }
 
-public class CloseClientPacketHandler : IPacketHander
+public class CloseClientPacketHandler : IPacketHandler
 {
     public void ProcessPacket(IPacket Packet)
     {
-        CloseClientPacket? packet = IPacketHander.CheckPacket<CloseClientPacket>(Packet);
+        CloseClientPacket? packet = IPacketHandler.CheckPacket<CloseClientPacket>(Packet);
         if (packet == null)
             return;
 

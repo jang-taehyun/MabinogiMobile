@@ -41,7 +41,7 @@ public class GameManager : MonoBehaviour
                 IPacket? packet = NetworkManager.NetworkManagerInstance.ReadPacket(out id);
                 if (packet is null)
                     break;
-                NetworkManager.NetworkManagerInstance.PacketObjectHandler[id].Invoke(packet);
+                PacketHandler.handler[id].Invoke(packet);
             }
 
         }
@@ -49,12 +49,6 @@ public class GameManager : MonoBehaviour
         {
             e.OutputExceptionLog();
         }
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
         
     }
 
