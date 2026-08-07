@@ -21,7 +21,7 @@ public class Character : MonoBehaviour
     InputAction? RightRotateAction = null;
     InputAction? AttackAction = null;
 
-    private void Start()
+    void Start()
     {
         try
         {
@@ -31,7 +31,7 @@ public class Character : MonoBehaviour
         }
         catch(MobinogiException e)
         {
-            Debug.Log(e.Message);
+            e.OutputExceptionLog();
         }
     }
 

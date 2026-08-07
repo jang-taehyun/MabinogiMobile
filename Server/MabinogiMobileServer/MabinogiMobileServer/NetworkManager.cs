@@ -1,14 +1,16 @@
-﻿using System;
+﻿using CoreModule;
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using CoreModule;
+using System.Numerics;
 
 namespace MabinogiMobileServer
 {
     class NetworkManager : IDisposable
     {
+        // singleton //
+        private NetworkManager() { }
         private static NetworkManager? _inst;
         public static NetworkManager NetworkManagerInstance
         {
@@ -22,9 +24,16 @@ namespace MabinogiMobileServer
 
         Listener listener = Listener.Instance;
         public Dictionary<int, Player> ClientList { get; private set; } = new Dictionary<int, Player>();
-        public List<Player> CloseClientList { get; private set; } = new List<Player>();
+        public Queue<Player> CloseClientQueue { get; private set; } = new Queue<Player>();
 
-        private NetworkManager() { }
+        // todo : if you add packet, register PacketObjectGenerator
+        public readonly Dictionary<PacketID, Func<Socket, IPacket>> PacketObjectGenerator = new Dictionary<PacketID, Func<Socket, IPacket>>()
+        {
+            { PacketID.AllocatedPlayerID,   (Socket sock) => new AllocatedPlayerIDPacket(ReadData(sock, AllocatedPlayerIDPacket.PacketSize))    },
+            { PacketID.Transform,           (Socket sock) => new TransformPacket(ReadData(sock, TransformPacket.PacketSize))                    },
+            { PacketID.Attack,              (Socket sock) => new AttackPacket(ReadData(sock, AttackPacket.PacketSize))                          },
+            { PacketID.CloseClient,         (Socket sock) => new CloseClientPacket(ReadData(sock, CloseClientPacket.PacketSize))                },
+        };
 
         public void RunServer() => listener.Run();
 
@@ -42,7 +51,7 @@ namespace MabinogiMobileServer
                 {
                     NewPlayer.PlayerID = new Random().Next(1, 100);
                 } while (ClientList.ContainsKey(NewPlayer.PlayerID) is true);
-                SendData(PacketID.AllocatedPlayerID, new AllocatedPlayerIDPacket(NewPlayer.PlayerID).Buffer, NewClient);
+                SendPacket(PacketID.AllocatedPlayerID, new AllocatedPlayerIDPacket(NewPlayer.PlayerID).Buffer, NewClient);
 
                 // add new client to ClientList
                 ClientList.Add(NewPlayer.PlayerID, NewPlayer);
@@ -55,7 +64,7 @@ namespace MabinogiMobileServer
                     if (item.Key != NewPlayer.PlayerID)
                     {
                         packet = new TransformPacket(item.Value.PlayerID, item.Value.Transform);
-                        SendData(PacketID.Transform, packet.Buffer, NewClient);
+                        SendPacket(PacketID.Transform, packet.Buffer, NewClient);
                     }
                 }
 
@@ -65,7 +74,7 @@ namespace MabinogiMobileServer
             }
         }
 
-        public IPacket? ReadData(out PacketID ID, Player player)
+        public IPacket? ReadPacket(out PacketID ID, Player player)
         {
             IPacket? packet = null;
             ID = PacketID.Unknown;
@@ -73,7 +82,7 @@ namespace MabinogiMobileServer
             // close client
             if (player.sock.Poll(0, SelectMode.SelectRead) == true && player.sock.Available == 0)
             {
-                CloseClientList.Add(player);
+                CloseClientQueue.Enqueue(player);
                 return packet;
             }
 
@@ -93,44 +102,11 @@ namespace MabinogiMobileServer
                 ID = PacketHeader.DeserializePacketHeader(header);
             }
 
-            byte[] buffer;
-            if (ID is PacketID.AllocatedPlayerID)
-            {
-                buffer = new byte[AllocatedPlayerIDPacket.PacketSize];
-                using (NetworkStream ns = new NetworkStream(player.sock))
-                {
-                    ns.ReadExactly(buffer, 0, buffer.Length);
-                }
-
-                packet = new AllocatedPlayerIDPacket(buffer);
-            }
-
-            if (ID is PacketID.Transform)
-            {
-                buffer = new byte[TransformPacket.PacketSize];
-                using (NetworkStream ns = new NetworkStream(player.sock))
-                {
-                    ns.ReadExactly(buffer, 0, buffer.Length);
-                }
-
-                packet = new TransformPacket(buffer);
-            }
-
-            if (ID is PacketID.Attack)
-            {
-                buffer = new byte[AttackPacket.PacketSize];
-                using (NetworkStream ns = new NetworkStream(player.sock))
-                {
-                    ns.ReadExactly(buffer, 0, buffer.Length);
-                }
-
-                packet = new AttackPacket(buffer);
-            }
-
-            return packet;
+            // read data
+            return PacketObjectGenerator[ID].Invoke(player.sock);
         }
 
-        public void SendData(PacketID ID, byte[] Buffer, Socket client)
+        public void SendPacket(PacketID ID, byte[] Buffer, Socket client)
         {
             byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(ID), Buffer);
             using (NetworkStream ns = new NetworkStream(client))
@@ -145,24 +121,34 @@ namespace MabinogiMobileServer
             {
                 if(ExcludeID is null || (ExcludeID is not null && item.Key != ExcludeID))
                 {
-                    SendData(ID, Buffer, item.Value.sock);
+                    SendPacket(ID, Buffer, item.Value.sock);
                 }
             }
         }
 
+        private static byte[] ReadData(Socket socket, int PacketSize)
+        {
+            byte[] buffer = new byte[PacketSize];
+            using (NetworkStream ns = new NetworkStream(socket))
+            {
+                ns.ReadExactly(buffer, 0, buffer.Length);
+            }
+
+            return buffer;
+        }
+
         public void CloseClientSocket()
         {
-            while (CloseClientList.Count > 0)
+            while (CloseClientQueue.Count > 0)
             {
-                int ClosePlayerID = CloseClientList[0].PlayerID;
-                Console.WriteLine($"[close client] : {CloseClientList[0].PlayerID}");
+                Player CloseClient = CloseClientQueue.Dequeue();
+                Console.WriteLine($"[close client] : {CloseClient.PlayerID}");
 
-                ClientList.Remove(CloseClientList[0].PlayerID);
-                CloseClientList[0].sock.Shutdown(SocketShutdown.Both);
-                CloseClientList[0].sock.Close();
-                CloseClientList.RemoveAt(0);
+                ClientList.Remove(CloseClient.PlayerID);
+                CloseClient.sock.Shutdown(SocketShutdown.Both);
+                CloseClient.sock.Close();
 
-                Broadcast(PacketID.CloseClient, new CloseClientPacket(ClosePlayerID).Buffer);
+                Broadcast(PacketID.CloseClient, new CloseClientPacket(CloseClient.PlayerID).Buffer);
             }
         }
 
