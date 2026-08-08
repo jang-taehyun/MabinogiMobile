@@ -4,7 +4,6 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using CoreModule;
-using System.Linq;
 
 public class Character : MonoBehaviour
 {
@@ -112,14 +111,14 @@ public class Character : MonoBehaviour
             throw new MobinogiException("right rotate action not find");
 
         AttackAction = InputComponent.actions.FindAction("CharacterControl/Attack");
-        if (RightRotateAction == null)
+        if (AttackAction == null)
             throw new MobinogiException("attack action not find");
     }
 
     public void MoveCharacter(TransformPacket packet)
     {
-        transform.position = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
-        transform.rotation = new Quaternion(packet.Rotation[0], packet.Rotation[1], packet.Rotation[2], packet.Rotation[3]);
+        transform.position = new Vector3(packet.PositionX, packet.PositionY, packet.PositionZ);
+        transform.rotation = new Quaternion(packet.RotationX, packet.RotationY, packet.RotationZ, packet.RotationW);
     }
 
     public void OutputAttackAnimation()
@@ -138,6 +137,6 @@ public class Character : MonoBehaviour
         };
 
         TransformPacket packet = new TransformPacket(PlayerID, buffer);
-        return packet.Buffer;
+        return packet.SerializePacket();
     }
 }

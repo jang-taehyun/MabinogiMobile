@@ -6,25 +6,23 @@ namespace MabinogiMobileServer
     {
         static void Main(string[] args)
         {
-            NetworkManager.NetworkManagerInstance.RunServer();
+            NetworkManager.Instance.RunServer();
 
             while (true)
             {
                 // accept client
-                NetworkManager.NetworkManagerInstance.AcceptClient();
+                NetworkManager.Instance.AcceptClient();
 
                 // process packet
-                foreach (var item in NetworkManager.NetworkManagerInstance.ClientList)
+                foreach (var item in GameManager.Instance.ConntectedClient)
                 {
                     PacketID ID = PacketID.Unknown;
-                    IPacket? ReceivePacket = NetworkManager.NetworkManagerInstance.ReadPacket(ID: out ID, item.Value);
-
-                    if (ReceivePacket is not null)
-                        PacketHandler.handler[ID].Invoke(ReceivePacket);
+                    IPacketHandler? ReceivePacket = NetworkManager.Instance.ReadPacket(id: out ID, item.Value);
+                    ReceivePacket?.ProcessPacket();
                 }
 
                 // close client
-                NetworkManager.NetworkManagerInstance.CloseClientSocket();
+                NetworkManager.Instance.CloseClientSocket();
             }
         }
     }

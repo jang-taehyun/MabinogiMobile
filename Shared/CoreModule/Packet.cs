@@ -49,11 +49,8 @@ namespace CoreModule
 
     public interface IPacket
     {
-        int PlayerID { get; }
-        byte[] Buffer { get; }
-
         byte[] SerializePacket();
-        void DeserializePacket();
+        void DeserializePacket(byte[] buffer);
     }
 
     public class AllocatedPlayerIDPacket : IPacket
@@ -67,38 +64,17 @@ namespace CoreModule
         }
 
         public int PlayerID { get; private set; } = 0;
-        public byte[] Buffer { get; private set; } = null!;
 
-        public AllocatedPlayerIDPacket(int PlayerID)
-        {
-            this.PlayerID = PlayerID;
-            SerializePacket();
-        }
+        public AllocatedPlayerIDPacket(int playerId) => PlayerID = playerId;
+        public AllocatedPlayerIDPacket(byte[] buffer) => DeserializePacket(buffer);
 
-        public AllocatedPlayerIDPacket(byte[] Buffer)
-        {
-            this.Buffer = Buffer;
-            DeserializePacket();
-        }
+        public byte[] SerializePacket() => BitConverter.GetBytes(PlayerID);
 
-        public byte[] SerializePacket()
-        {
-            if (Buffer is null)
-            {
-                Buffer = new byte[PacketSize];
-
-                byte[] SerializeResult = BitConverter.GetBytes(PlayerID);
-                Array.Copy(SerializeResult, Buffer, PacketSize);
-            }
-
-            return Buffer;
-        }
-
-        public void DeserializePacket()
+        public void DeserializePacket(byte[] buffer)
         {
             if (PlayerID is 0)
             {
-                PlayerID = BitConverter.ToInt32(Buffer, 0);
+                PlayerID = BitConverter.ToInt32(buffer, 0);
             }
         }
     }
@@ -107,38 +83,16 @@ namespace CoreModule
     {
         public int PlayerID { get; private set; } = 0;
         public float[] Transform { get; private set; } = null!;
-        public float[] Position
-        {
-            get
-            {
-                float[] ret = new float[3];
-                for (int i = 0; i < 3; ++i)
-                    ret[i] = Transform[i];
-                return ret;
-            }
-        }
-        public float[] Rotation
-        {
-            get
-            {
-                float[] ret = new float[4];
-                for (int i = 0; i < 4; ++i)
-                    ret[i] = Transform[i + 3];
-                return ret;
-            }
-        }
-        public float[] Scale
-        {
-            get
-            {
-                float[] ret = new float[3];
-                for (int i = 0; i < 3; ++i)
-                    ret[i] = Transform[i + 7];
-                return ret;
-            }
-        }
-
-        public byte[] Buffer { get; private set; } = null!;
+        public float PositionX => Transform[0];
+        public float PositionY => Transform[1];
+        public float PositionZ => Transform[2];
+        public float RotationX => Transform[3];
+        public float RotationY => Transform[4];
+        public float RotationZ => Transform[5];
+        public float RotationW => Transform[6];
+        public float ScaleX => Transform[7];
+        public float ScaleY => Transform[8];
+        public float ScaleZ => Transform[9];
 
         public static int PacketSize
         {
@@ -148,63 +102,55 @@ namespace CoreModule
             }
         }
 
-        public TransformPacket(byte[] Buffer)
+        public TransformPacket(int playerId, float[] transform)
         {
-            this.Buffer = Buffer;
-            DeserializePacket();
+            PlayerID = playerId;
+            Transform = transform;
         }
+        public TransformPacket(byte[] buffer) => DeserializePacket(buffer);
 
-        public TransformPacket(int PlayerID, float[] Transform)
-        {
-            this.PlayerID = PlayerID;
-            this.Transform = Transform;
-            SerializePacket();
-        }
-
-        public void DeserializePacket()
+        public void DeserializePacket(byte[] buffer)
         {
             if (PlayerID is 0)
             {
                 Transform = new float[10];
                 byte[] data = new byte[4];
-                int Offset = 0;
+                int offset = 0;
 
                 // deserialize Player ID
-                Array.Copy(Buffer, Offset, data, 0, 4);
+                Array.Copy(buffer, offset, data, 0, 4);
                 PlayerID = BitConverter.ToInt32(data);
-                Offset += data.Length;
+                offset += data.Length;
 
                 // deserialize Transform
                 for (int i = 0; i < 10; ++i)
                 {
-                    Array.Copy(Buffer, Offset, data, 0, 4);
+                    Array.Copy(buffer, offset, data, 0, 4);
                     Transform[i] = BitConverter.ToSingle(data);
-                    Offset += data.Length;
+                    offset += data.Length;
                 }
             }
         }
 
         public byte[] SerializePacket()
         {
-            if (Buffer is null)
+            byte[] buffer = new byte[PacketSize];
+            int offset = 0;
+
+            // serialize Player ID
+            byte[] serializeResult = BitConverter.GetBytes(PlayerID);
+            Array.Copy(serializeResult, 0, buffer, 0, serializeResult.Length);
+            offset += serializeResult.Length;
+
+            // serialize transform
+            for (int i = 0; i < Transform.Length; ++i)
             {
-                Buffer = new byte[PacketSize];
-
-                // serialize Player ID
-                byte[] SerializeResult = BitConverter.GetBytes(PlayerID);
-                Array.Copy(SerializeResult, 0, Buffer, 0, SerializeResult.Length);
-                int Offset = SerializeResult.Length;
-
-                // serialize transform
-                for (int i = 0; i < Transform.Length; ++i)
-                {
-                    SerializeResult = BitConverter.GetBytes(Transform[i]);
-                    Array.Copy(SerializeResult, 0, Buffer, Offset, SerializeResult.Length);
-                    Offset += SerializeResult.Length;
-                }
+                serializeResult = BitConverter.GetBytes(Transform[i]);
+                Array.Copy(serializeResult, 0, buffer, offset, serializeResult.Length);
+                offset += serializeResult.Length;
             }
 
-            return Buffer;
+            return buffer;
         }
     }
 

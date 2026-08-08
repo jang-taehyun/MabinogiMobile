@@ -6,12 +6,12 @@ using System.Net.Sockets;
 
 namespace MabinogiMobileServer
 {
-    class NetworkManager : IDisposable
+    class NetworkManager
     {
         // singleton //
         private NetworkManager() { }
         private static NetworkManager? _inst;
-        public static NetworkManager NetworkManagerInstance
+        public static NetworkManager Instance
         {
             get
             {
@@ -21,52 +21,52 @@ namespace MabinogiMobileServer
             }
         }
 
-        Listener listener = Listener.Instance;
-        public Dictionary<int, Player> ClientList { get; private set; } = new Dictionary<int, Player>();
+        Listener ListenerSocket = Listener.Instance;
         public Queue<Player> CloseClientQueue { get; private set; } = new Queue<Player>();
 
-        public void RunServer() => listener.Run();
+        public void RunServer() => ListenerSocket.Run();
 
         public void AcceptClient()
         {
-            Socket? NewClient = listener.AcceptClient();
-            if (NewClient is not null)
+            Socket? newClient = ListenerSocket.AcceptClient();
+            if (newClient is not null)
             {
                 // allocate player ID to New client
-                Player NewPlayer = new Player()
+                Player newPlayer = new Player()
                 { 
-                    sock = NewClient
+                    sock = newClient
                 };
                 do
                 {
-                    NewPlayer.PlayerID = new Random().Next(1, 100);
-                } while (ClientList.ContainsKey(NewPlayer.PlayerID) is true);
-                SendPacket(PacketID.AllocatedPlayerID, new AllocatedPlayerIDPacket(NewPlayer.PlayerID).Buffer, NewClient);
+                    newPlayer.PlayerID = new Random().Next(1, 100);
+                } while (GameManager.Instance.ConntectedClient.ContainsKey(newPlayer.PlayerID) is true);
+                IPacket newPlayerIdPacket = new AllocatedPlayerIDPacket(newPlayer.PlayerID);
+                SendPacket(PacketID.AllocatedPlayerID, newPlayerIdPacket, newClient);
 
                 // add new client to ClientList
-                ClientList.Add(NewPlayer.PlayerID, NewPlayer);
-                Console.WriteLine($"New Client connected : {NewPlayer.PlayerID}");
+                GameManager.Instance.AddPlayer(newPlayer);
+                Console.WriteLine($"New Client connected : {newPlayer.PlayerID}");
 
                 // send client list info to New client
-                foreach (var item in ClientList)
+                foreach (var item in GameManager.Instance.ConntectedClient)
                 {
-                    if (item.Key != NewPlayer.PlayerID)
+                    if (item.Key != newPlayer.PlayerID)
                     {
                         TransformPacket OtherPlayerInfoPacket = new TransformPacket(item.Value.PlayerID, item.Value.Transform);
-                        SendPacket(PacketID.Transform, OtherPlayerInfoPacket.Buffer, NewClient);
+                        SendPacket(PacketID.Transform, OtherPlayerInfoPacket, newClient);
                     }
                 }
 
                 // broadcast packet that new client connected
-                TransformPacket NewPlayerInfoPacket = new TransformPacket(NewPlayer.PlayerID, NewPlayer.Transform);
-                Broadcast(PacketID.Transform, NewPlayerInfoPacket.Buffer, NewPlayer.PlayerID);
+                TransformPacket newPlayerInfoPacket = new TransformPacket(newPlayer.PlayerID, newPlayer.Transform);
+                Broadcast(PacketID.Transform, newPlayerInfoPacket, newPlayer.PlayerID);
             }
         }
 
-        public IPacket? ReadPacket(out PacketID ID, Player player)
+        public IPacketHandler? ReadPacket(out PacketID id, Player player)
         {
-            IPacket? packet = null;
-            ID = PacketID.Unknown;
+            IPacketHandler? packet = null;
+            id = PacketID.Unknown;
 
             // close client
             if (player.sock.Poll(0, SelectMode.SelectRead) == true && player.sock.Available == 0)
@@ -83,34 +83,34 @@ namespace MabinogiMobileServer
             using (NetworkStream ns = new NetworkStream(player.sock))
             {
                 byte[] header = new byte[PacketHeader.HeaderSize];
-                int ReadLen = 0;
-                while (ReadLen < header.Length)
+                int readLen = 0;
+                while (readLen < header.Length)
                 {
-                    ReadLen += ns.Read(header, ReadLen, PacketHeader.HeaderSize - ReadLen);
+                    readLen += ns.Read(header, readLen, PacketHeader.HeaderSize - readLen);
                 }
-                ID = PacketHeader.DeserializePacketHeader(header);
+                id = PacketHeader.DeserializePacketHeader(header);
             }
 
             // read data
-            return PacketHandler.generator[ID].Invoke(player.sock);
+            return PacketHandlerGenerator.Generator[id].Invoke(player.sock);
         }
 
-        public void SendPacket(PacketID ID, byte[] Buffer, Socket client)
+        public void SendPacket(PacketID id, IPacket data, Socket client)
         {
-            byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(ID), Buffer);
+            byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(id), data.SerializePacket());
             using (NetworkStream ns = new NetworkStream(client))
             {
                 ns.Write(packet, 0, packet.Length);
             }
         }
 
-        public void Broadcast(PacketID ID, byte[] Buffer, int? ExcludeID = null)
+        public void Broadcast(PacketID id, IPacket data, int? excludeID = null)
         {
-            foreach(var item in ClientList)
+            foreach(var item in GameManager.Instance.ConntectedClient)
             {
-                if(ExcludeID is null || (ExcludeID is not null && item.Key != ExcludeID))
+                if(excludeID is null || (excludeID is not null && item.Key != excludeID))
                 {
-                    SendPacket(ID, Buffer, item.Value.sock);
+                    SendPacket(id, data, item.Value.sock);
                 }
             }
         }
@@ -133,19 +133,9 @@ namespace MabinogiMobileServer
                 Player CloseClient = CloseClientQueue.Dequeue();
                 Console.WriteLine($"[close client] : {CloseClient.PlayerID}");
 
-                ClientList.Remove(CloseClient.PlayerID);
-                CloseClient.sock.Shutdown(SocketShutdown.Both);
-                CloseClient.sock.Close();
-
-                Broadcast(PacketID.CloseClient, new CloseClientPacket(CloseClient.PlayerID).Buffer);
+                GameManager.Instance.RemovePlayer(CloseClient);
+                Broadcast(PacketID.CloseClient, new CloseClientPacket(CloseClient.PlayerID));
             }
-        }
-
-        public void Dispose()
-        {
-            // end
-            foreach (var item in ClientList)
-                item.Value.sock.Close();
         }
 
         // Listener class

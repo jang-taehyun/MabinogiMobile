@@ -1,12 +1,11 @@
 ﻿#nullable enable
 
 using CoreModule;
-using System;
-using System.Collections.Generic;
 using System.Net.Sockets;
+using UnityEditor.Analytics;
 using UnityEngine;
 
-public class NetworkManager : MonoBehaviour, IDisposable
+public class NetworkManager : MonoBehaviour
 {
     private static NetworkManager? instance = null;
     public static NetworkManager NetworkManagerInstance
@@ -32,12 +31,25 @@ public class NetworkManager : MonoBehaviour, IDisposable
 
         // get allocated Player ID
         PacketID id = PacketID.Unknown;
-        IPacket? packet = null;
+        IPacketHandler? packet = null;
         while (packet is null)
         {
             packet = ReadPacket(out id);
         }
-        PacketHandler.handler[id].Invoke(packet);
+        packet.ProcessPacket();
+    }
+
+    void Start()
+    {
+        // create remote player
+        while (true)
+        {
+            PacketID id = PacketID.Unknown;
+            IPacketHandler? packet = NetworkManager.NetworkManagerInstance.ReadPacket(out id);
+            if (packet is null)
+                break;
+            packet.ProcessPacket();
+        }
     }
 
     private void Update()
@@ -45,11 +57,10 @@ public class NetworkManager : MonoBehaviour, IDisposable
         while (true)
         {
             PacketID id = PacketID.Unknown;
-            IPacket? packet = ReadPacket(out id);
+            IPacketHandler? packet = ReadPacket(out id);
             if (packet is null)
                 break;
-
-            PacketHandler.handler[id].Invoke(packet);
+            packet.ProcessPacket();
         }
     }
 
@@ -62,9 +73,9 @@ public class NetworkManager : MonoBehaviour, IDisposable
         }
     }
 
-    public IPacket? ReadPacket(out PacketID packetID)
+    public IPacketHandler? ReadPacket(out PacketID packetID)
     {
-        IPacket? packet = null;
+        IPacketHandler? packet = null;
         packetID = PacketID.Unknown;
         if (socket.Available <= 0)
         {
@@ -84,7 +95,7 @@ public class NetworkManager : MonoBehaviour, IDisposable
         }
 
         // read data
-        return PacketHandler.generator[packetID].Invoke(socket);
+        return PacketHandlerGenerator.Generator[packetID].Invoke(socket);
     }
 
     public static byte[] ReadData(Socket Socket, int PacketSize)
@@ -101,11 +112,6 @@ public class NetworkManager : MonoBehaviour, IDisposable
     }
 
     void OnDestroy()
-    {
-        Dispose();
-    }
-
-    public void Dispose()
     {
         socket?.Shutdown(SocketShutdown.Both);
         socket?.Close();

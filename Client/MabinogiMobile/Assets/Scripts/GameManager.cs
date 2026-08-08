@@ -33,17 +33,6 @@ public class GameManager : MonoBehaviour
 
             // create local player
             SpanwLocalPlayer(LocalPlayerID);
-
-            // create remote player
-            while (true)
-            {
-                PacketID id = PacketID.Unknown;
-                IPacket? packet = NetworkManager.NetworkManagerInstance.ReadPacket(out id);
-                if (packet is null)
-                    break;
-                PacketHandler.handler[id].Invoke(packet);
-            }
-
         }
         catch(MobinogiException e)
         {
@@ -61,7 +50,7 @@ public class GameManager : MonoBehaviour
     public void SpanwLocalPlayer(int LocalPlayerID)
     {
         // spawn local player
-        Players.Add(LocalPlayerID, CharacterSpawner.SpawnCharacter(LocalPlayerID, new Vector3(0, 0, 0), new Quaternion(0, 0, 0, 0), true));
+        Players.Add(LocalPlayerID, CharacterSpawner.SpawnCharacter(LocalPlayerID, Vector3.zero, Quaternion.identity, true));
         Debug.Log($"[my ID {LocalPlayerID}] : create local");
     }
 
