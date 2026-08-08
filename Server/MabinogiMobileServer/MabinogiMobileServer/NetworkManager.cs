@@ -67,6 +67,7 @@ namespace MabinogiMobileServer
         {
             IPacketHandler? packet = null;
             id = PacketID.Unknown;
+            int packetSize = 0;
 
             // close client
             if (player.sock.Poll(0, SelectMode.SelectRead) == true && player.sock.Available == 0)
@@ -88,16 +89,16 @@ namespace MabinogiMobileServer
                 {
                     readLen += ns.Read(header, readLen, PacketHeader.HeaderSize - readLen);
                 }
-                id = PacketHeader.DeserializePacketHeader(header);
+                PacketHeader.DeserializePacketHeader(header, out id, out packetSize);
             }
 
             // read data
-            return PacketHandlerGenerator.Generator[id].Invoke(player.sock);
+            return PacketHandlerGenerator.Generator[id].Invoke(player.sock, packetSize);
         }
 
         public void SendPacket(PacketID id, IPacket data, Socket client)
         {
-            byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(id), data.SerializePacket());
+            byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(id, data.PacketSize), data.SerializePacket());
             using (NetworkStream ns = new NetworkStream(client))
             {
                 ns.Write(packet, 0, packet.Length);

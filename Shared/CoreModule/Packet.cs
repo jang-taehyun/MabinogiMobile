@@ -1,5 +1,13 @@
 ﻿using System;
 
+// Packet //
+/**
+ * todo) how to add new packet
+ * 
+ * if you want to add packet
+ * 1) create packet class, inherit IPacket interface
+ * 2) register PacketID
+*/
 namespace CoreModule
 {
     public enum PacketID
@@ -14,28 +22,61 @@ namespace CoreModule
         Max
     }
 
+    public interface IPacket
+    {
+        int PacketSize { get; }
+        byte[] SerializePacket();
+        void DeserializePacket(byte[] buffer);
+    }
+
+    public interface IPacketHandler
+    {
+        IPacket Packet { get; }
+        void ProcessPacket();
+    }
+
     public class PacketHeader
     {
         public static int HeaderSize
         {
             get
             {
-                return sizeof(PacketID);
+                return sizeof(PacketID) + sizeof(int);
             }
         }
 
         public PacketID ID { get; set; }
+        public int PacketSize { get; set; }
 
-        public static byte[] SerializePacketHeader(PacketID id)
+        public static byte[] SerializePacketHeader(PacketID id, int packetSize)
         {
-            return BitConverter.GetBytes((int)id);
+            byte[] header = new byte[sizeof(PacketID) + sizeof(int)];
+            int offset = 0;
+
+            byte[] serializeBuf = BitConverter.GetBytes((int)id);
+            Array.Copy(serializeBuf, 0, header, offset, serializeBuf.Length);
+            offset += serializeBuf.Length;
+
+            serializeBuf = BitConverter.GetBytes(packetSize);
+            Array.Copy(serializeBuf, 0, header, offset, serializeBuf.Length);
+            offset += serializeBuf.Length;
+
+            return header;
         }
 
-        public static PacketID DeserializePacketHeader(byte[] buffer)
+        public static void DeserializePacketHeader(byte[] buffer, out PacketID id, out int packetSize)
         {
-            byte[] PacketHeaderBuf = new byte[PacketHeader.HeaderSize];
-            Array.Copy(buffer, PacketHeaderBuf, PacketHeader.HeaderSize);
-            return (PacketID)BitConverter.ToInt32(PacketHeaderBuf, 0);
+            int offset = 0;
+
+            byte[] deserializeBuf = new byte[sizeof(PacketID)];
+            Array.Copy(buffer, offset, deserializeBuf, 0, sizeof(PacketID));
+            id = (PacketID)BitConverter.ToInt32(deserializeBuf, 0);
+            offset += sizeof(int);
+
+            deserializeBuf = new byte[sizeof(int)];
+            Array.Copy(buffer, offset, deserializeBuf, 0, sizeof(int));
+            packetSize = BitConverter.ToInt32(deserializeBuf, 0);
+            offset += sizeof(int);
         }
 
         public static byte[] AppendPacket(byte[] header, byte[] data)
@@ -47,15 +88,9 @@ namespace CoreModule
         }
     }
 
-    public interface IPacket
-    {
-        byte[] SerializePacket();
-        void DeserializePacket(byte[] buffer);
-    }
-
     public class AllocatedPlayerIDPacket : IPacket
     {
-        public static int PacketSize
+        public int PacketSize
         {
             get
             {
@@ -94,7 +129,7 @@ namespace CoreModule
         public float ScaleY => Transform[8];
         public float ScaleZ => Transform[9];
 
-        public static int PacketSize
+        public int PacketSize
         {
             get
             {

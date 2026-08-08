@@ -10,7 +10,7 @@ public class Spawner : MonoBehaviour
         Character CastingCharacter = SpawnCharacter.GetComponent<Character>();
         if (CastingCharacter is not null)
         {
-            CastingCharacter.SendEvent += NetworkManager.NetworkManagerInstance.SendPacket;
+            CastingCharacter.SendEvent += NetworkManager.Instance.SendPacket;
             CastingCharacter.IsLocal = IsLocalPlayer;
             CastingCharacter.PlayerID = PlayerID;
 

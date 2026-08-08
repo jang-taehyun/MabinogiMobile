@@ -22,5 +22,6 @@ namespace MabinogiMobileServer
 
         public void AddPlayer(Player player) => connectedClient.Add(player.PlayerID, player);
         public void RemovePlayer(Player player) => connectedClient.Remove(player.PlayerID);
+        public void ModifyPlayerTransform(int playerId, float[] transform) => connectedClient[playerId].Transform = transform;
     }
 }

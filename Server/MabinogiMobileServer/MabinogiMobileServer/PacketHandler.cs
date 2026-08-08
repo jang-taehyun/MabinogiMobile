@@ -5,9 +5,10 @@ using System.Net.Sockets;
 
 // server packet handler //
 /**
- * todo) how to add new packet
+ * todo) how to add new packet in server
+ * 
  * if you add packet
- * 1) create packet handler class, inherit packet class and IPacketHandler interface
+ * 1) create packet handler class, inherit IPacketHandler interface
  * 2) register packet handler generator
 */
 namespace MabinogiMobileServer
@@ -15,62 +16,57 @@ namespace MabinogiMobileServer
     public class PacketHandlerGenerator
     {
         // if you add packet, register packet handler generator
-        private static Dictionary<PacketID, Func<Socket, IPacketHandler>> generator = new Dictionary<PacketID, Func<Socket, IPacketHandler>>
+        private static Dictionary<PacketID, Func<Socket, int, IPacketHandler>> generator = new Dictionary<PacketID, Func<Socket, int, IPacketHandler>>
         {
-            { PacketID.AllocatedPlayerID,   (Socket sock) => new AllocatedPlayerIDPacketHandler(NetworkManager.ReadData(sock, AllocatedPlayerIDPacketHandler.PacketSize)) },
-            { PacketID.Transform,           (Socket sock) => new TransformPacketHandler(NetworkManager.ReadData(sock, TransformPacketHandler.PacketSize)) },
-            { PacketID.Attack,              (Socket sock) => new AttackPacketHandler(NetworkManager.ReadData(sock, AttackPacketHandler.PacketSize)) },
-            { PacketID.CloseClient,         (Socket sock) => new CloseClientPacketHandler(NetworkManager.ReadData(sock, CloseClientPacketHandler.PacketSize)) },
+            { PacketID.AllocatedPlayerID,   (Socket sock, int packetSize) => new AllocatedPlayerIDPacketHandler(NetworkManager.ReadData(sock, packetSize))  },
+            { PacketID.Transform,           (Socket sock, int packetSize) => new TransformPacketHandler(NetworkManager.ReadData(sock, packetSize))          },
+            { PacketID.Attack,              (Socket sock, int packetSize) => new AttackPacketHandler(NetworkManager.ReadData(sock, packetSize))             },
+            { PacketID.CloseClient,         (Socket sock, int packetSize) => new CloseClientPacketHandler(NetworkManager.ReadData(sock, packetSize))        },
         };
-        public static IReadOnlyDictionary<PacketID, Func<Socket, IPacketHandler>> Generator => generator;
+        public static IReadOnlyDictionary<PacketID, Func<Socket, int, IPacketHandler>> Generator => generator;
     }
 
-    public interface IPacketHandler
+    class AllocatedPlayerIDPacketHandler : IPacketHandler
     {
-        void ProcessPacket();
-    }
+        public IPacket Packet { get; }
 
-    class AllocatedPlayerIDPacketHandler : AllocatedPlayerIDPacket, IPacketHandler
-    {
-        public AllocatedPlayerIDPacketHandler(int playerId) : base(playerId) { }
-        public AllocatedPlayerIDPacketHandler(byte[] buffer) : base(buffer) { }
+        public AllocatedPlayerIDPacketHandler(byte[] buffer) => Packet = new AllocatedPlayerIDPacket(buffer);
 
         public void ProcessPacket() { }
     }
 
-    class TransformPacketHandler : TransformPacket, IPacketHandler
+    class TransformPacketHandler : IPacketHandler
     {
-        public TransformPacketHandler(int playerId, float[] transform) : base(playerId, transform) { }
-        public TransformPacketHandler(byte[] buffer) : base(buffer) { }
+        public IPacket Packet { get; }
+
+        public TransformPacketHandler(byte[] buffer) => Packet = new TransformPacket(buffer);
 
         public void ProcessPacket()
         {
-            foreach (var client in GameManager.Instance.ConntectedClient)
-                if (client.Key == PlayerID)
-                {
-                    client.Value.Transform = Transform;
-                    break;
-                }
-
-            NetworkManager.Instance.Broadcast(PacketID.Transform, this, PlayerID);
+            TransformPacket packet = (TransformPacket)Packet;
+            GameManager.Instance.ModifyPlayerTransform(packet.PlayerID, packet.Transform);
+            NetworkManager.Instance.Broadcast(PacketID.Transform, packet, packet.PlayerID);
         }
     }
 
-    public class AttackPacketHandler : AttackPacket, IPacketHandler
+    public class AttackPacketHandler : IPacketHandler
     {
-        public AttackPacketHandler(int PlayerID) : base(PlayerID) { }
-        public AttackPacketHandler(byte[] Buffer) : base(Buffer) { }
+        public IPacket Packet { get; }
+
+        public AttackPacketHandler(byte[] Buffer) => Packet = new AttackPacket(Buffer);
 
         public void ProcessPacket()
         {
-            NetworkManager.Instance.Broadcast(PacketID.Attack, this, PlayerID);
+            AttackPacket packet = (AttackPacket)Packet;
+            NetworkManager.Instance.Broadcast(PacketID.Attack, packet, packet.PlayerID);
         }
     }
 
-    public class CloseClientPacketHandler : CloseClientPacket, IPacketHandler
+    public class CloseClientPacketHandler : IPacketHandler
     {
-        public CloseClientPacketHandler(int PlayerID) : base(PlayerID) { }
-        public CloseClientPacketHandler(byte[] Buffer) : base(Buffer) { }
+        public IPacket Packet { get; }
+
+        public CloseClientPacketHandler(byte[] Buffer) => Packet = new AttackPacket(Buffer);
 
         public void ProcessPacket() {}
     }

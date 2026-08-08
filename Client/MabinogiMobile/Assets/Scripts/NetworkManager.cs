@@ -2,13 +2,12 @@
 
 using CoreModule;
 using System.Net.Sockets;
-using UnityEditor.Analytics;
 using UnityEngine;
 
 public class NetworkManager : MonoBehaviour
 {
     private static NetworkManager? instance = null;
-    public static NetworkManager NetworkManagerInstance
+    public static NetworkManager Instance
     {
         get
         {
@@ -30,13 +29,16 @@ public class NetworkManager : MonoBehaviour
         Debug.Log("Server connected!");
 
         // get allocated Player ID
-        PacketID id = PacketID.Unknown;
-        IPacketHandler? packet = null;
-        while (packet is null)
+        // todo : test code
         {
-            packet = ReadPacket(out id);
+            PacketID id = PacketID.Unknown;
+            IPacketHandler? packet = null;
+            while (packet is null)
+            {
+                packet = ReadPacket(out id);
+            }
+            packet.ProcessPacket();
         }
-        packet.ProcessPacket();
     }
 
     void Start()
@@ -45,7 +47,7 @@ public class NetworkManager : MonoBehaviour
         while (true)
         {
             PacketID id = PacketID.Unknown;
-            IPacketHandler? packet = NetworkManager.NetworkManagerInstance.ReadPacket(out id);
+            IPacketHandler? packet = NetworkManager.Instance.ReadPacket(out id);
             if (packet is null)
                 break;
             packet.ProcessPacket();
@@ -66,7 +68,7 @@ public class NetworkManager : MonoBehaviour
 
     public void SendPacket(PacketID ID, byte[] buffer)
     {
-        byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(ID), buffer);
+        byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(ID, buffer.Length), buffer);
         using (NetworkStream ns = new NetworkStream(socket))
         {
             ns.Write(packet, 0, packet.Length);
@@ -83,19 +85,20 @@ public class NetworkManager : MonoBehaviour
         }
 
         // read header
+        int packetSize = 0;
         using (NetworkStream ns = new NetworkStream(socket))
         {
             byte[] header = new byte[PacketHeader.HeaderSize];
-            int ReadLen = 0;
-            while (ReadLen < header.Length)
+            int readLen = 0;
+            while (readLen < header.Length)
             {
-                ReadLen += ns.Read(header, ReadLen, PacketHeader.HeaderSize - ReadLen);
+                readLen += ns.Read(header, readLen, PacketHeader.HeaderSize - readLen);
             }
-            packetID = PacketHeader.DeserializePacketHeader(header);
+            PacketHeader.DeserializePacketHeader(header, out packetID, out packetSize);
         }
 
         // read data
-        return PacketHandlerGenerator.Generator[packetID].Invoke(socket);
+        return PacketHandlerGenerator.Generator[packetID].Invoke(socket, packetSize);
     }
 
     public static byte[] ReadData(Socket Socket, int PacketSize)

@@ -8,85 +8,86 @@ using UnityEngine;
 
 // client packet handler //
 /**
-* todo) how to add new packet
+* todo) how to add new packet in client
+* 
 * if you add packet
-* 1) Create packet handler class, inherit packet class and IPacketHandler interface.
+* 1) Create packet handler class, inherit IPacketHandler interface.
 * 2) And then, register packet handler generator
 */
 public class PacketHandlerGenerator
 {
     // if you add packet, register packet handler generator
-    private static Dictionary<PacketID, Func<Socket, IPacketHandler>> generator = new Dictionary<PacketID, Func<Socket, IPacketHandler>>
+    private static Dictionary<PacketID, Func<Socket, int, IPacketHandler>> generator = new Dictionary<PacketID, Func<Socket, int, IPacketHandler>>
     {
-        { PacketID.AllocatedPlayerID,   (Socket sock) => new AllocatedPlayerIDPacketHandler(NetworkManager.ReadData(sock, AllocatedPlayerIDPacketHandler.PacketSize)) },
-        { PacketID.Transform,           (Socket sock) => new TransformPacketHandler(NetworkManager.ReadData(sock, TransformPacketHandler.PacketSize)) },
-        { PacketID.Attack,              (Socket sock) => new AttackPacketHandler(NetworkManager.ReadData(sock, AttackPacketHandler.PacketSize)) },
-        { PacketID.CloseClient,         (Socket sock) => new CloseClientPacketHandler(NetworkManager.ReadData(sock, CloseClientPacketHandler.PacketSize)) },
+        { PacketID.AllocatedPlayerID,   (Socket sock, int packetSize) => new AllocatedPlayerIDPacketHandler(NetworkManager.ReadData(sock, packetSize))  },
+        { PacketID.Transform,           (Socket sock, int packetSize) => new TransformPacketHandler(NetworkManager.ReadData(sock, packetSize))          },
+        { PacketID.Attack,              (Socket sock, int packetSize) => new AttackPacketHandler(NetworkManager.ReadData(sock, packetSize))             },
+        { PacketID.CloseClient,         (Socket sock, int packetSize) => new CloseClientPacketHandler(NetworkManager.ReadData(sock, packetSize))        },
     };
-    public static IReadOnlyDictionary<PacketID, Func<Socket, IPacketHandler>> Generator => generator;
+    public static IReadOnlyDictionary<PacketID, Func<Socket, int, IPacketHandler>> Generator => generator;
 }
 
-public interface IPacketHandler
+public class AllocatedPlayerIDPacketHandler : IPacketHandler
 {
-    void ProcessPacket();
-}
+    public IPacket Packet { get; }
 
-public class AllocatedPlayerIDPacketHandler : AllocatedPlayerIDPacket, IPacketHandler
-{
-    public AllocatedPlayerIDPacketHandler(int playerId) : base(playerId) { }
-    public AllocatedPlayerIDPacketHandler(byte[] buffer) : base(buffer) { }
+    public AllocatedPlayerIDPacketHandler(byte[] buffer) => Packet = new AllocatedPlayerIDPacket(buffer);
 
     public void ProcessPacket()
     {
-        GameManager.GameManagerInstance.LocalPlayerID = PlayerID;
+        GameManager.Instance.LocalPlayerID = ((AllocatedPlayerIDPacket)Packet).PlayerID;
     }
 }
 
-public class TransformPacketHandler : TransformPacket, IPacketHandler
+public class TransformPacketHandler : IPacketHandler
 {
-    public TransformPacketHandler(int playerId, float[] transform) : base(playerId, transform) { }
-    public TransformPacketHandler(byte[] buffer) : base(buffer) { }
+    public IPacket Packet { get; }
+
+    public TransformPacketHandler(byte[] buffer) => Packet = new TransformPacket(buffer);
 
     public void ProcessPacket()
     {
+        TransformPacket packet = (TransformPacket)Packet;
+
         // if remote player is not exist in scene, create new remote player
-        if (GameManager.GameManagerInstance.Players.ContainsKey(PlayerID) is false)
+        if (GameManager.Instance.Players.ContainsKey(packet.PlayerID) is false)
         {
-            Vector3 pos = new Vector3(PositionX, PositionY, PositionZ);
-            Quaternion rot = new Quaternion(RotationX, RotationY, RotationZ, RotationW);
-            GameManager.GameManagerInstance.SpawnRemotePlayer(PlayerID, pos, rot);
+            Vector3 pos = new Vector3(packet.PositionX, packet.PositionY, packet.PositionZ);
+            Quaternion rot = new Quaternion(packet.RotationX, packet.RotationY, packet.RotationZ, packet.RotationW);
+            GameManager.Instance.SpawnRemotePlayer(packet.PlayerID, pos, rot);
         }
         else
         {
             // move remote character
-            Character remoteCharacter = GameManager.GameManagerInstance.Players[PlayerID].GetComponent<Character>();
+            Character remoteCharacter = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
             if (remoteCharacter is not null)
-                remoteCharacter.MoveCharacter(this);
+                remoteCharacter.MoveCharacter(packet);
         }
     }
 }
 
-public class AttackPacketHandler : AttackPacket, IPacketHandler
+public class AttackPacketHandler : IPacketHandler
 {
-    public AttackPacketHandler(int PlayerID) : base(PlayerID) { }
-    public AttackPacketHandler(byte[] Buffer) : base(Buffer) { }
+    public IPacket Packet { get; }
+
+    public AttackPacketHandler(byte[] Buffer) => Packet = new AttackPacket(Buffer);
 
     public void ProcessPacket()
     {
+        AttackPacket packet = (AttackPacket)Packet;
+
         // output attack animation to remote player
-        Character RemoteCharacter = GameManager.GameManagerInstance.Players[PlayerID].GetComponent<Character>();
+        Character RemoteCharacter = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
         if (RemoteCharacter is not null)
             RemoteCharacter.OutputAttackAnimation();
     }
 }
 
-public class CloseClientPacketHandler : CloseClientPacket, IPacketHandler
+public class CloseClientPacketHandler : IPacketHandler
 {
-    public CloseClientPacketHandler(int PlayerID) : base(PlayerID) { }
-    public CloseClientPacketHandler(byte[] Buffer) : base(Buffer) { }
+    public IPacket Packet { get; }
 
-    public void ProcessPacket()
-    {
-        GameManager.GameManagerInstance.RemoveRemotePlayer(PlayerID);
-    }
+    public CloseClientPacketHandler(byte[] Buffer) => Packet = new CloseClientPacket(Buffer);
+
+    public void ProcessPacket() => GameManager.Instance.RemoveRemotePlayer(((CloseClientPacket)Packet).PlayerID);
 }
