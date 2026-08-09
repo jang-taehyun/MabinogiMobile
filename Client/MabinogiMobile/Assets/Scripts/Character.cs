@@ -4,11 +4,12 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using CoreModule;
+using UnityEngine.Rendering.Universal;
 
 public class Character : MonoBehaviour
 {
-    public float MoveSpeed { get; private set; } = 5.0f;
-    public float RotateSpeed { get; private set; } = 30.0f;
+    public float MoveSpeed { get; private set; } = 20.0f;
+    public float RotateSpeed { get; private set; } = 80.0f;
 
     public bool IsLocal = false;
     public int PlayerID = 0;
@@ -17,8 +18,7 @@ public class Character : MonoBehaviour
     Animator CharacterAnimator = null!;
 
     InputAction? MoveAction = null;
-    InputAction? LeftRotateAction = null;
-    InputAction? RightRotateAction = null;
+    InputAction? RotationAction = null;
     InputAction? AttackAction = null;
 
     void Start()
@@ -52,8 +52,8 @@ public class Character : MonoBehaviour
 
         if (MoveAction != null)
         {
-            Vector2 MoveValue = MoveAction.ReadValue<Vector2>();
-            if (MoveValue != Vector2.zero)
+            Vector3 MoveValue = MoveAction.ReadValue<Vector3>();
+            if (MoveValue != Vector3.zero)
             {
                 transform.Translate(MoveValue.normalized * MoveSpeed * Time.deltaTime);
                 CharacterAnimator.SetFloat("MoveSpeed", MoveSpeed);
@@ -65,17 +65,14 @@ public class Character : MonoBehaviour
             }
         }
 
-        if (LeftRotateAction != null && LeftRotateAction.IsPressed())
+        if (RotationAction != null)
         {
-            transform.Rotate(new Vector3(0, 1, 0) * RotateSpeed * Time.deltaTime, Space.World);
-            IsControl = true;
-        }
-
-        if (RightRotateAction != null && RightRotateAction.IsPressed())
-        {
-            transform.Rotate(new Vector3(0, -1, 0) * RotateSpeed * Time.deltaTime, Space.World);
-            IsControl = true;
-        }
+            Vector2 RotateValue = RotationAction.ReadValue<Vector2>();
+            if (Mouse.current.leftButton.IsPressed() && RotateValue != Vector2.zero)
+            {
+                transform.Rotate(new Vector3(0, RotateValue.y, 0) * RotateSpeed * Time.deltaTime, Space.World);
+                IsControl = true;
+            }        }
 
         if (IsControl is true)
             SendEvent(PacketID.Transform, ConvertTransformToByteArray());
@@ -83,36 +80,70 @@ public class Character : MonoBehaviour
 
     private void AttackOther()
     {
-        if (AttackAction != null && AttackAction.IsPressed() is true)
+        if (AttackAction != null && AttackAction.WasReleasedThisFrame() is true)
         {
             CharacterAnimator.SetTrigger("AttackTrigger");
             SendEvent(PacketID.Attack, BitConverter.GetBytes(PlayerID));
         }
     }
 
-    public void SetInputAction()
+    public void SetLocalPlayer()
     {
-        PlayerInput InputComponent = GetComponent<PlayerInput>();
-        if (InputComponent == null)
+        SetCamera();
+        SetAudioListener();
+        SetInputAction();
+    }
+
+    private void SetInputAction()
+    {
+        PlayerInput inputComponent = GetComponent<PlayerInput>();
+        if (inputComponent == null)
             throw new MobinogiException("player input component를 찾지 못함");
 
-        InputComponent.enabled = true;
+        inputComponent.enabled = true;
 
-        MoveAction = InputComponent.actions.FindAction("CharacterControl/Move");
+        MoveAction = inputComponent.actions.FindAction("CharacterControl/Move");
         if (MoveAction == null)
             throw new MobinogiException("move action not find");
 
-        LeftRotateAction = InputComponent.actions.FindAction("CharacterControl/LeftRotate");
-        if (LeftRotateAction == null)
-            throw new MobinogiException("left rotate action not find");
+        RotationAction = inputComponent.actions.FindAction("CharacterControl/Rotation");
+        if (RotationAction == null)
+            throw new MobinogiException("rotation action not find");
 
-        RightRotateAction = InputComponent.actions.FindAction("CharacterControl/RightRotate");
-        if (RightRotateAction == null)
-            throw new MobinogiException("right rotate action not find");
-
-        AttackAction = InputComponent.actions.FindAction("CharacterControl/Attack");
+        AttackAction = inputComponent.actions.FindAction("CharacterControl/Attack");
         if (AttackAction == null)
             throw new MobinogiException("attack action not find");
+    }
+
+    private void SetCamera()
+    {
+        Camera cameraComponent = GetComponentInChildren<Camera>();
+        if (cameraComponent == null)
+        {
+            Debug.Log("can not find camera component in character");
+            return;
+        }
+        cameraComponent.enabled = true;
+
+        UniversalAdditionalCameraData cameraData = GetComponentInChildren<UniversalAdditionalCameraData>();
+        if (cameraData == null)
+        {
+            Debug.Log("can not find camera additional data in character");
+            return;
+        }
+        cameraData.enabled = true;
+    }
+
+    private void SetAudioListener()
+    {
+        AudioListener audioListenerComponent = GetComponentInChildren<AudioListener>();
+        if (audioListenerComponent == null)
+        {
+            Debug.Log("can not find audio listener component in character");
+            return;
+        }
+
+        audioListenerComponent.enabled = true;
     }
 
     public void MoveCharacter(TransformPacket packet)

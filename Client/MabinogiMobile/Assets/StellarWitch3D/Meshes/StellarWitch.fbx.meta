@@ -1,14 +1,7 @@
 fileFormatVersion: 2
 guid: d172c22791a73d64ab9cfd99ee72de93
-AssetOrigin:
-  serializedVersion: 1
-  productId: 309418
-  packageName: StellarWitch 3D
-  packageVersion: 1.1
-  assetPath: Assets/StellarWitch3D/Meshes/StellarWitch.fbx
-  uploadId: 740464
 ModelImporter:
-  serializedVersion: 24300
+  serializedVersion: 22200
   internalIDToNameTable: []
   externalObjects:
   - first:
@@ -41,7 +34,6 @@ ModelImporter:
     materialName: 0
     materialSearch: 1
     materialLocation: 1
-    searchTexturesGlobally: 0
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
@@ -49,6 +41,8 @@ ModelImporter:
     optimizeGameObjects: 0
     removeConstantScaleCurves: 0
     motionNodeName: 
+    rigImportErrors: 
+    rigImportWarnings: 
     animationImportErrors: 
     animationImportWarnings: 
     animationRetargetingWarnings: 
@@ -89,9 +83,6 @@ ModelImporter:
     maxBonesPerVertex: 4
     minBoneWeight: 0.001
     optimizeBones: 1
-    generateMeshLods: 0
-    meshLodGenerationFlags: 0
-    maximumMeshLod: -1
     meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
@@ -1321,3 +1312,10 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 309418
+  packageName: StellarWitch 3D
+  packageVersion: 1.1
+  assetPath: Assets/StellarWitch3D/Meshes/StellarWitch.fbx
+  uploadId: 740464

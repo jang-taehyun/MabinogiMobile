@@ -16,7 +16,7 @@ public class Spawner : MonoBehaviour
 
             if (IsLocalPlayer is true)
             {
-                CastingCharacter.SetInputAction();
+                CastingCharacter.SetLocalPlayer();
             } 
         }
 
