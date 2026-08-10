@@ -2,10 +2,12 @@
 
 using CoreModule;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class NetworkManager : MonoBehaviour
 {
+    // singleton //
     private static NetworkManager? instance = null;
     public static NetworkManager Instance
     {
@@ -25,93 +27,71 @@ public class NetworkManager : MonoBehaviour
     {
         // connect server
         socket = new Socket(addressFamily: AddressFamily.InterNetwork, socketType: SocketType.Stream, protocolType: ProtocolType.Tcp);
-        socket.Connect(ServerIP, ServerPort);
-        Debug.Log("Server connected!");
 
-        // get allocated Player ID
-        // todo : test code
-        {
-            PacketID id = PacketID.Unknown;
-            IPacketHandler? packet = null;
-            while (packet is null)
-            {
-                packet = ReadPacket(out id);
-            }
-            packet.ProcessPacket();
-        }
-    }
+        // set non-blocking socket
+        socket.Blocking = false;
+        socket.NoDelay = true;
 
-    void Start()
-    {
-        // create remote player
-        while (true)
-        {
-            PacketID id = PacketID.Unknown;
-            IPacketHandler? packet = NetworkManager.Instance.ReadPacket(out id);
-            if (packet is null)
-                break;
-            packet.ProcessPacket();
-        }
+        // connect server
+        _ = ConnectServer();
     }
 
     private void Update()
     {
-        while (true)
-        {
-            PacketID id = PacketID.Unknown;
-            IPacketHandler? packet = ReadPacket(out id);
-            if (packet is null)
-                break;
-            packet.ProcessPacket();
-        }
+        _ = ReadPacket();
     }
 
-    public void SendPacket(PacketID ID, byte[] buffer)
+    private async Task ConnectServer()
     {
-        byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(ID, buffer.Length), buffer);
-        using (NetworkStream ns = new NetworkStream(socket))
-        {
-            ns.Write(packet, 0, packet.Length);
-        }
+        await socket.ConnectAsync(ServerIP, ServerPort);
+        Debug.Log("Server connected!");
     }
 
-    public IPacketHandler? ReadPacket(out PacketID packetID)
+    public async Task SendPacket(PacketID id, byte[] data)
     {
-        IPacketHandler? packet = null;
-        packetID = PacketID.Unknown;
-        if (socket.Available <= 0)
-        {
-            return packet;
-        }
+        byte[] packet = PacketHeader.AppendHeader(id, data);
+        int writeLen = 0;
+        while (writeLen < packet.Length)
+            writeLen += await socket.SendAsync(packet[writeLen..], SocketFlags.None);
+    }
 
+    public async Task ReadPacket()
+    {
         // read header
-        int packetSize = 0;
-        using (NetworkStream ns = new NetworkStream(socket))
+        byte[] header = new byte[PacketHeader.HeaderSize];
+        int readLen = 0;
+        while (readLen < header.Length)
         {
-            byte[] header = new byte[PacketHeader.HeaderSize];
-            int readLen = 0;
-            while (readLen < header.Length)
+            readLen += await socket.ReceiveAsync(header[readLen..], SocketFlags.None);
+            
+            // disconnected server
+            if (readLen == 0)
             {
-                readLen += ns.Read(header, readLen, PacketHeader.HeaderSize - readLen);
+                DisconnectedToServer();
+                return;
             }
-            PacketHeader.DeserializePacketHeader(header, out packetID, out packetSize);
         }
+
+        // deserialize header
+
+        PacketID id = PacketID.Unknown;
+        int dataSize = 0;
+        PacketHeader.DeserializePacketHeader(header, out id, out dataSize);
 
         // read data
-        return PacketHandlerGenerator.Generator[packetID].Invoke(socket, packetSize);
+        byte[] data = new byte[dataSize];
+        readLen = 0;
+        while (readLen < data.Length)
+            readLen += await socket.ReceiveAsync(data[readLen..], SocketFlags.None);
+
+        // create packet handler & enter job queue
+        GameManager.Instance.JobQueue.Enqueue(PacketHandler.Generator[id].Invoke(data));
     }
 
-    public static byte[] ReadData(Socket Socket, int PacketSize)
+    private void DisconnectedToServer()
     {
-        byte[] buffer = new byte[PacketSize];
-        using (NetworkStream ns = new NetworkStream(Socket))
-        {
-            int ReadLen = 0;
-            while (ReadLen < buffer.Length)
-                ReadLen += ns.Read(buffer, ReadLen, buffer.Length - ReadLen);
-        }
-
-        return buffer;
+        Debug.Log("서버와 연결이 끊겼습니다.");
+        OnDestroy();
     }
 
     void OnDestroy()

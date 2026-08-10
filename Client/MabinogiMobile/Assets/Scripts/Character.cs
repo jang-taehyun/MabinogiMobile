@@ -5,48 +5,14 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using CoreModule;
 using UnityEngine.Rendering.Universal;
+using System.Threading.Tasks;
 
 public class Character : MonoBehaviour
 {
-    public float MoveSpeed { get; private set; } = 20.0f;
+    // transform //
+    public float MoveSpeed { get; private set; } = 8.0f;
     public float RotateSpeed { get; private set; } = 80.0f;
-
-    public bool IsLocal = false;
-    public int PlayerID = 0;
-    public event Action<PacketID, byte[]> SendEvent = delegate (PacketID a, byte[] b) { };
-
-    Animator CharacterAnimator = null!;
-
-    InputAction? MoveAction = null;
-    InputAction? RotationAction = null;
-    InputAction? AttackAction = null;
-
-    void Start()
-    {
-        try
-        {
-            CharacterAnimator = GetComponentInChildren<Animator>();
-            if (CharacterAnimator is null)
-                throw new MobinogiException("character animator is not finded");
-        }
-        catch(MobinogiException e)
-        {
-            e.OutputExceptionLog();
-        }
-    }
-
-    // Update is called once per frame
-    [Obsolete("test code", false)]
-    void Update()
-    {
-        if (IsLocal is true)
-        {
-            ControlCharacter();
-            AttackOther();
-        }
-    }
-
-    private void ControlCharacter()
+    private void ControlLocalPlayerTransform()
     {
         bool IsControl = false;
 
@@ -72,28 +38,50 @@ public class Character : MonoBehaviour
             {
                 transform.Rotate(new Vector3(0, RotateValue.y, 0) * RotateSpeed * Time.deltaTime, Space.World);
                 IsControl = true;
-            }        }
+            }
+        }
 
         if (IsControl is true)
-            SendEvent(PacketID.Transform, ConvertTransformToByteArray());
+            _ = NetworkManager.Instance.SendPacket(PacketID.Transform, ConvertTransformToByteArray());
+    }
+    public void MoveRemoteCharacter(TransformPacket packet)
+    {
+        transform.position = new Vector3(packet.PositionX, packet.PositionY, packet.PositionZ);
+        transform.rotation = new Quaternion(packet.RotationX, packet.RotationY, packet.RotationZ, packet.RotationW);
     }
 
+    // attack //
     private void AttackOther()
     {
         if (AttackAction != null && AttackAction.WasReleasedThisFrame() is true)
         {
             CharacterAnimator.SetTrigger("AttackTrigger");
-            SendEvent(PacketID.Attack, BitConverter.GetBytes(PlayerID));
+
+            // ------------------
+            // todo : test code
+            byte[] data = new byte[sizeof(int) + sizeof(int)];
+            int offset = 0;
+            BitConverter.TryWriteBytes(data.AsSpan<byte>(offset, sizeof(int)), PlayerID);
+            offset += sizeof(int);
+            BitConverter.TryWriteBytes(data.AsSpan<byte>(offset, sizeof(int)), 0);
+            offset += sizeof(int);
+            // ------------------
+
+            _ = NetworkManager.Instance.SendPacket(PacketID.Attack, BitConverter.GetBytes(PlayerID));
         }
     }
-
-    public void SetLocalPlayer()
+    public void OutputAttackAnimation()
     {
-        SetCamera();
-        SetAudioListener();
-        SetInputAction();
+        CharacterAnimator.SetTrigger("AttackTrigger");
     }
 
+    // animation //
+    Animator CharacterAnimator = null!;
+
+    // input //
+    InputAction? MoveAction = null;
+    InputAction? RotationAction = null;
+    InputAction? AttackAction = null;
     private void SetInputAction()
     {
         PlayerInput inputComponent = GetComponent<PlayerInput>();
@@ -115,6 +103,40 @@ public class Character : MonoBehaviour
             throw new MobinogiException("attack action not find");
     }
 
+    // unity event method //
+    void Start()
+    {
+        try
+        {
+            CharacterAnimator = GetComponentInChildren<Animator>();
+            if (CharacterAnimator is null)
+                throw new MobinogiException("character animator is not finded");
+        }
+        catch(MobinogiException e)
+        {
+            e.OutputExceptionLog();
+        }
+    }
+
+    [Obsolete("test code", false)]
+    void Update()
+    {
+        if (IsLocal is true)
+        {
+            ControlLocalPlayerTransform();
+            AttackOther();
+        }
+    }
+
+    // local player //
+    public bool IsLocal = false;
+    public int PlayerID = 0;
+    public void SetLocalPlayer()
+    {
+        SetCamera();
+        SetAudioListener();
+        SetInputAction();
+    }
     private void SetCamera()
     {
         Camera cameraComponent = GetComponentInChildren<Camera>();
@@ -146,28 +168,37 @@ public class Character : MonoBehaviour
         audioListenerComponent.enabled = true;
     }
 
-    public void MoveCharacter(TransformPacket packet)
-    {
-        transform.position = new Vector3(packet.PositionX, packet.PositionY, packet.PositionZ);
-        transform.rotation = new Quaternion(packet.RotationX, packet.RotationY, packet.RotationZ, packet.RotationW);
-    }
-
-    public void OutputAttackAnimation()
-    {
-        CharacterAnimator.SetTrigger("AttackTrigger");
-    }
-
     [Obsolete("temp code", false)]
     private byte[] ConvertTransformToByteArray()
     {
-        float[] buffer = new float[10]
+        float[] transformData = new float[(int)TransformElement.element]
         {
             transform.position.x, transform.position.y, transform.position.z,
-            transform.rotation.x, transform.rotation.y, transform.rotation.z,transform.rotation.w,
-            transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z
+            transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w
         };
 
-        TransformPacket packet = new TransformPacket(PlayerID, buffer);
-        return packet.SerializePacket();
+        byte[] ret = new byte[transformData.Length * sizeof(float)];
+        int offset = 0;
+        for (int i = 0; i < transformData.Length; ++i)
+        {
+            BitConverter.TryWriteBytes(ret.AsSpan<byte>(offset, sizeof(float)), transformData[i]);
+            offset += sizeof(float);
+        }
+
+        return ret;
+    }
+
+    [Obsolete("temp code", false)]
+    public enum TransformElement : int
+    {
+        element = 7
+    }
+
+    [Obsolete("temp code", false)]
+    public static int SerializeLength {
+        get
+        {
+            return sizeof(int) + sizeof(float) * (int)TransformElement.element;
+        }
     }
 }

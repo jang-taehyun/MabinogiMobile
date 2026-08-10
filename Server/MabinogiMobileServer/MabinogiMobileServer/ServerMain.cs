@@ -1,5 +1,4 @@
-﻿using CoreModule;
-
+﻿
 namespace MabinogiMobileServer
 {
     internal class ServerMain
@@ -11,18 +10,14 @@ namespace MabinogiMobileServer
             while (true)
             {
                 // accept client
-                NetworkManager.Instance.AcceptClient();
+                _ = NetworkManager.Instance.AcceptClient();
 
-                // process packet
+                // read packet
                 foreach (var item in GameManager.Instance.ConntectedClient)
-                {
-                    PacketID ID = PacketID.Unknown;
-                    IPacketHandler? ReceivePacket = NetworkManager.Instance.ReadPacket(id: out ID, item.Value);
-                    ReceivePacket?.ProcessPacket();
-                }
+                    _ = NetworkManager.Instance.ReadPacket(item.Value);
 
-                // close client
-                NetworkManager.Instance.CloseClientSocket();
+                // process job
+                GameManager.Instance.RunJob();
             }
         }
     }

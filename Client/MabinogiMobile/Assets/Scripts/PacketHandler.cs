@@ -4,7 +4,9 @@ using CoreModule;
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using UnityEngine;
+using static Character;
 
 // client packet handler //
 /**
@@ -14,28 +16,64 @@ using UnityEngine;
 * 1) Create packet handler class, inherit IPacketHandler interface.
 * 2) And then, register packet handler generator
 */
-public class PacketHandlerGenerator
+public class PacketHandler
 {
     // if you add packet, register packet handler generator
-    private static Dictionary<PacketID, Func<Socket, int, IPacketHandler>> generator = new Dictionary<PacketID, Func<Socket, int, IPacketHandler>>
+    private static Dictionary<PacketID, Func<byte[], IPacketHandler>> generator = new Dictionary<PacketID, Func<byte[], IPacketHandler>>
     {
-        { PacketID.AllocatedPlayerID,   (Socket sock, int packetSize) => new AllocatedPlayerIDPacketHandler(NetworkManager.ReadData(sock, packetSize))  },
-        { PacketID.Transform,           (Socket sock, int packetSize) => new TransformPacketHandler(NetworkManager.ReadData(sock, packetSize))          },
-        { PacketID.Attack,              (Socket sock, int packetSize) => new AttackPacketHandler(NetworkManager.ReadData(sock, packetSize))             },
-        { PacketID.CloseClient,         (Socket sock, int packetSize) => new CloseClientPacketHandler(NetworkManager.ReadData(sock, packetSize))        },
+        { PacketID.InitialWorldState,   (byte[] data) => new InitialWorldStatePacketHandler(data)  },
+        { PacketID.Transform,           (byte[] data) => new TransformPacketHandler(data)          },
+        { PacketID.Attack,              (byte[] data) => new AttackPacketHandler(data)             },
+        { PacketID.CloseClient,         (byte[] data) => new CloseClientPacketHandler(data)        },
     };
-    public static IReadOnlyDictionary<PacketID, Func<Socket, int, IPacketHandler>> Generator => generator;
+    public static IReadOnlyDictionary<PacketID, Func<byte[], IPacketHandler>> Generator => generator;
 }
 
-public class AllocatedPlayerIDPacketHandler : IPacketHandler
+public class InitialWorldStatePacketHandler : IPacketHandler
 {
     public IPacket Packet { get; }
 
-    public AllocatedPlayerIDPacketHandler(byte[] buffer) => Packet = new AllocatedPlayerIDPacket(buffer);
+    public InitialWorldStatePacketHandler(byte[] buffer) => Packet = new InitialWorldStatePacket(buffer);
 
-    public void ProcessPacket()
+    public void Process()
     {
-        GameManager.Instance.LocalPlayerID = ((AllocatedPlayerIDPacket)Packet).PlayerID;
+        InitialWorldStatePacket packet = (InitialWorldStatePacket)Packet;
+
+        // get allocated playe ID & spawn local character
+        GameManager.Instance.LocalPlayerID = packet.AllocatedPlayerID;
+        GameManager.Instance.SpanwLocalPlayer();
+
+        // spawn remote player
+        int offset = Character.SerializeLength;
+        int pos = 0;
+        int playerId = 0;
+        float[] transform = new float[(int)TransformElement.element];
+        while (pos < packet.WorldStateData.Length)
+        {
+            Span<byte> remotePlayerData = new Span<byte>(packet.WorldStateData, pos, offset);
+            int innerPos = 0;
+
+            // read remote player ID
+            playerId = MemoryMarshal.Read<int>(remotePlayerData.Slice(innerPos, sizeof(int)));
+            innerPos += sizeof(int);
+
+            // read remote player's character transform
+            for (int i = 0; i < transform.Length; ++i)
+            {
+                transform[i] = MemoryMarshal.Read<float>(remotePlayerData.Slice(innerPos, sizeof(float)));
+                innerPos += sizeof(float);
+            }
+
+            // spawn remote player's character
+            GameManager.Instance.SpawnRemotePlayer(
+                playerId,
+                new Vector3(transform[0], transform[1], transform[2]),
+                new Quaternion(transform[3], transform[4], transform[5], transform[6])
+            );
+
+            // increate pos
+            pos += offset;
+        }
     }
 }
 
@@ -45,7 +83,7 @@ public class TransformPacketHandler : IPacketHandler
 
     public TransformPacketHandler(byte[] buffer) => Packet = new TransformPacket(buffer);
 
-    public void ProcessPacket()
+    public void Process()
     {
         TransformPacket packet = (TransformPacket)Packet;
 
@@ -61,7 +99,7 @@ public class TransformPacketHandler : IPacketHandler
             // move remote character
             Character remoteCharacter = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
             if (remoteCharacter is not null)
-                remoteCharacter.MoveCharacter(packet);
+                remoteCharacter.MoveRemoteCharacter(packet);
         }
     }
 }
@@ -72,12 +110,12 @@ public class AttackPacketHandler : IPacketHandler
 
     public AttackPacketHandler(byte[] Buffer) => Packet = new AttackPacket(Buffer);
 
-    public void ProcessPacket()
+    public void Process()
     {
         AttackPacket packet = (AttackPacket)Packet;
 
         // output attack animation to remote player
-        Character RemoteCharacter = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
+        Character RemoteCharacter = GameManager.Instance.Players[packet.AttackPlayerID].GetComponent<Character>();
         if (RemoteCharacter is not null)
             RemoteCharacter.OutputAttackAnimation();
     }
@@ -89,5 +127,5 @@ public class CloseClientPacketHandler : IPacketHandler
 
     public CloseClientPacketHandler(byte[] Buffer) => Packet = new CloseClientPacket(Buffer);
 
-    public void ProcessPacket() => GameManager.Instance.RemoveRemotePlayer(((CloseClientPacket)Packet).PlayerID);
+    public void Process() => GameManager.Instance.RemoveRemotePlayer(((CloseClientPacket)Packet).DisconnectedPlayerID);
 }

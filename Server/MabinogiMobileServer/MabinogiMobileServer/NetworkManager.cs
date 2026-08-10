@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace MabinogiMobileServer
 {
@@ -21,122 +22,95 @@ namespace MabinogiMobileServer
             }
         }
 
-        Listener ListenerSocket = Listener.Instance;
-        public Queue<Player> CloseClientQueue { get; private set; } = new Queue<Player>();
+        Listener listener = Listener.Instance;
 
-        public void RunServer() => ListenerSocket.Run();
+        public void RunServer() => listener.Run();
 
-        public void AcceptClient()
+        public async Task AcceptClient()
         {
-            Socket? newClient = ListenerSocket.AcceptClient();
-            if (newClient is not null)
+            // accept new client
+            Socket newClient = await listener.AcceptClient();
+
+            // allocate player ID to New client
+            int newPlayerID = new Random().Next(1, 100);
+            while (GameManager.Instance.ConntectedClient.ContainsKey(newPlayerID) is true)
+                newPlayerID = new Random().Next(1, 100);
+
+            // create & add new player
+            Player newPlayer = new Player()
             {
-                // allocate player ID to New client
-                Player newPlayer = new Player()
-                { 
-                    sock = newClient
-                };
-                do
-                {
-                    newPlayer.PlayerID = new Random().Next(1, 100);
-                } while (GameManager.Instance.ConntectedClient.ContainsKey(newPlayer.PlayerID) is true);
-                IPacket newPlayerIdPacket = new AllocatedPlayerIDPacket(newPlayer.PlayerID);
-                SendPacket(PacketID.AllocatedPlayerID, newPlayerIdPacket, newClient);
+                sock = newClient,
+                PlayerID = newPlayerID,
+            };
+            GameManager.Instance.AddPlayer(newPlayer);
+            Console.WriteLine($"New Client connected : {newPlayerID}");
 
-                // add new client to ClientList
-                GameManager.Instance.AddPlayer(newPlayer);
-                Console.WriteLine($"New Client connected : {newPlayer.PlayerID}");
+            // send world state to new player
+            IPacket initWorldStatePacket = new InitialWorldStatePacket(newPlayerID, GameManager.Instance.SerializePlayerInfomations(newPlayer));
+            await SendPacket(PacketID.InitialWorldState, initWorldStatePacket, newClient);
 
-                // send client list info to New client
-                foreach (var item in GameManager.Instance.ConntectedClient)
-                {
-                    if (item.Key != newPlayer.PlayerID)
-                    {
-                        TransformPacket OtherPlayerInfoPacket = new TransformPacket(item.Value.PlayerID, item.Value.Transform);
-                        SendPacket(PacketID.Transform, OtherPlayerInfoPacket, newClient);
-                    }
-                }
-
-                // broadcast packet that new client connected
-                TransformPacket newPlayerInfoPacket = new TransformPacket(newPlayer.PlayerID, newPlayer.Transform);
-                Broadcast(PacketID.Transform, newPlayerInfoPacket, newPlayer.PlayerID);
-            }
+            // broadcast packet that new client connected
+            TransformPacket newPlayerInfoPacket = new TransformPacket(newPlayer.PlayerID, newPlayer.Transform);
+            await Broadcast(PacketID.Transform, newPlayerInfoPacket, newPlayer.PlayerID);
         }
 
-        public IPacketHandler? ReadPacket(out PacketID id, Player player)
+        public async Task ReadPacket(Player player)
         {
-            IPacketHandler? packet = null;
-            id = PacketID.Unknown;
-            int packetSize = 0;
-
-            // close client
-            if (player.sock.Poll(0, SelectMode.SelectRead) == true && player.sock.Available == 0)
-            {
-                CloseClientQueue.Enqueue(player);
-                return packet;
-            }
-
-            // no data to read
-            if ((player.sock.Available > 0) is false)
-                return packet;
-
             // read header
-            using (NetworkStream ns = new NetworkStream(player.sock))
+            byte[] header = new byte[PacketHeader.HeaderSize];
+            int readLen = 0;
+            while (readLen < header.Length)
             {
-                byte[] header = new byte[PacketHeader.HeaderSize];
-                int readLen = 0;
-                while (readLen < header.Length)
+                readLen += await player.sock.ReceiveAsync(header[readLen..]);
+
+                // close client
+                if (readLen is 0)
                 {
-                    readLen += ns.Read(header, readLen, PacketHeader.HeaderSize - readLen);
+                    await CloseClientSocket(player);
+                    return;
                 }
-                PacketHeader.DeserializePacketHeader(header, out id, out packetSize);
             }
+
+            // deserialize header
+            PacketID id = PacketID.Unknown;
+            int dataSize = 0;
+            PacketHeader.DeserializePacketHeader(header, out id, out dataSize);
 
             // read data
-            return PacketHandlerGenerator.Generator[id].Invoke(player.sock, packetSize);
+            byte[] data = new byte[dataSize];
+            readLen = 0;
+            while (readLen < data.Length)
+                readLen += await player.sock.ReceiveAsync(data[readLen..]);
+
+            // create packet handler & enter job queue
+            GameManager.Instance.JobQueue.Enqueue(PacketHandler.Generator[id].Invoke(data));
         }
 
-        public void SendPacket(PacketID id, IPacket data, Socket client)
+        public async Task SendPacket(PacketID id, IPacket data, Socket client)
         {
-            byte[] packet = PacketHeader.AppendPacket(PacketHeader.SerializePacketHeader(id, data.PacketSize), data.SerializePacket());
-            using (NetworkStream ns = new NetworkStream(client))
-            {
-                ns.Write(packet, 0, packet.Length);
-            }
+            byte[] packet = PacketHeader.AppendHeader(id, data.SerializeData());
+            int sendLen = 0;
+            while (sendLen < packet.Length)
+                sendLen += await client.SendAsync(packet[sendLen..]);
         }
 
-        public void Broadcast(PacketID id, IPacket data, int? excludeID = null)
+        public async Task Broadcast(PacketID id, IPacket data, int? excludeID = null)
         {
             foreach(var item in GameManager.Instance.ConntectedClient)
             {
                 if(excludeID is null || (excludeID is not null && item.Key != excludeID))
                 {
-                    SendPacket(id, data, item.Value.sock);
+                    await SendPacket(id, data, item.Value.sock);
                 }
             }
         }
 
-        public static byte[] ReadData(Socket socket, int PacketSize)
+        public async Task CloseClientSocket(Player disconnectedPlayer)
         {
-            byte[] buffer = new byte[PacketSize];
-            using (NetworkStream ns = new NetworkStream(socket))
-            {
-                ns.ReadExactly(buffer, 0, buffer.Length);
-            }
+            Console.WriteLine($"[close client] : {disconnectedPlayer.PlayerID}");
+            GameManager.Instance.RemovePlayer(disconnectedPlayer);
 
-            return buffer;
-        }
-
-        public void CloseClientSocket()
-        {
-            while (CloseClientQueue.Count > 0)
-            {
-                Player CloseClient = CloseClientQueue.Dequeue();
-                Console.WriteLine($"[close client] : {CloseClient.PlayerID}");
-
-                GameManager.Instance.RemovePlayer(CloseClient);
-                Broadcast(PacketID.CloseClient, new CloseClientPacket(CloseClient.PlayerID));
-            }
+            await Broadcast(PacketID.CloseClient, new CloseClientPacket(disconnectedPlayer.PlayerID));
         }
 
         // Listener class
@@ -153,22 +127,26 @@ namespace MabinogiMobileServer
                 }
             }
 
-            private Socket? ListenSocket = null;
-            private const int PortNumber = 33355;
+            private Socket listenSocket = null!;
+            private const int portNumber = 33355;
 
             private Listener()
             {
                 try
                 {
-                    IPEndPoint LocalAddress = new IPEndPoint(address: IPAddress.Any, PortNumber);
+                    IPEndPoint LocalAddress = new IPEndPoint(address: IPAddress.Any, portNumber);
                     if (LocalAddress is null)
                         throw new MobinogiException("Address is null");
 
-                    ListenSocket = new Socket(addressFamily: AddressFamily.InterNetwork, socketType: SocketType.Stream, protocolType: ProtocolType.Tcp);
-                    if (ListenSocket is null)
+                    listenSocket = new Socket(addressFamily: AddressFamily.InterNetwork, socketType: SocketType.Stream, protocolType: ProtocolType.Tcp);
+                    if (listenSocket is null)
                         throw new MobinogiException("Listener is null");
 
-                    ListenSocket.Bind(LocalAddress);
+                    // set listener to non-blocking socket
+                    listenSocket.NoDelay = true;
+                    listenSocket.Blocking = false;
+
+                    listenSocket.Bind(LocalAddress);
                 }
                 catch (MobinogiException e)
                 {
@@ -176,24 +154,17 @@ namespace MabinogiMobileServer
                 }
             }
 
-            public void Run() => ListenSocket?.Listen(100);
+            public void Run() => listenSocket.Listen(100);
 
             public void Dispose()
             {
-                ListenSocket?.Close();
+                listenSocket?.Close();
             }
 
-            public Socket? AcceptClient()
+            public async Task<Socket> AcceptClient()
             {
-                Socket? client = null;
-
-                // client connected
-                if (ListenSocket?.Poll(0, SelectMode.SelectRead) is true)
-                {
-                    client = ListenSocket.Accept();
-                    Console.WriteLine($"client connected!");
-                }
-
+                Socket client = await listenSocket.AcceptAsync();
+                Console.WriteLine($"client connected!");
                 return client;
             }
         }
