@@ -1,8 +1,6 @@
 ﻿using CoreModule;
 using System;
 using System.Collections.Generic;
-using System.Net.Sockets;
-using System.Threading.Tasks;
 
 // server packet handler //
 /**
@@ -46,7 +44,7 @@ namespace MabinogiMobileServer
         {
             TransformPacket packet = (TransformPacket)Packet;
             GameManager.Instance.ModifyPlayerTransform(packet.PlayerID, packet.Transform);
-            _ = NetworkManager.Instance.Broadcast(PacketID.Transform, packet, packet.PlayerID);
+            NetworkManager.Instance.Broadcast(PacketID.Transform, packet, packet.PlayerID);
         }
     }
 
@@ -59,7 +57,7 @@ namespace MabinogiMobileServer
         public void Process()
         {
             AttackPacket packet = (AttackPacket)Packet;
-            _ = NetworkManager.Instance.Broadcast(PacketID.Attack, packet, packet.AttackPlayerID);
+            NetworkManager.Instance.Broadcast(PacketID.Attack, packet, packet.AttackPlayerID);
         }
     }
 

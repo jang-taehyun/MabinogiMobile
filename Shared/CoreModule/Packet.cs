@@ -47,45 +47,44 @@ namespace CoreModule
         }
 
         public PacketID ID { get; set; }
-        public int PacketSize { get; set; }
+        public int DataSize { get; set; }
 
         public static void SerializePacketHeader(PacketID id, int dataSize, Span<byte> header)
         {
-            int offset = 0;
+            int position = 0;
 
-            BitConverter.TryWriteBytes(header.Slice(offset, sizeof(PacketID)), (byte)id);
-            offset += sizeof(PacketID);
+            header[position] = (byte)id;
+            position += sizeof(PacketID);
 
-            BitConverter.TryWriteBytes(header.Slice(offset, sizeof(int)), dataSize);
-            offset += sizeof(int);
+            BitConverter.TryWriteBytes(header.Slice(position, sizeof(int)), dataSize);
+            position += sizeof(int);
         }
 
-        public static void DeserializePacketHeader(byte[] buffer, out PacketID id, out int packetSize)
+        public static void DeserializePacketHeader(byte[] buffer, out PacketID id, out int dataSize)
         {
-            int offset = 0;
+            int position = 0;
 
             // read Packet ID
-            ReadOnlySpan<byte> packetIDViewer = buffer.AsSpan<byte>(offset, sizeof(PacketID));
-            id = (PacketID)MemoryMarshal.Read<byte>(packetIDViewer);
-            offset += sizeof(PacketID);
+            id = (PacketID)buffer[0];
+            position += sizeof(PacketID);
 
             // read packet size
-            ReadOnlySpan<byte> packetSizeViewer = buffer.AsSpan<byte>(offset, sizeof(int));
-            packetSize = MemoryMarshal.Read<int>(packetSizeViewer);
-            offset += sizeof(int);
+            ReadOnlySpan<byte> packetSizeViewer = buffer.AsSpan<byte>(position, sizeof(int));
+            dataSize = MemoryMarshal.Read<int>(packetSizeViewer);
+            position += sizeof(int);
         }
 
         public static byte[] AppendHeader(PacketID id, byte[] data)
         {
             byte[] packet = new byte[PacketHeader.HeaderSize + data.Length];
-            int offset = 0;
+            int position = 0;
 
             // serialize packet header
-            SerializePacketHeader(id, data.Length, packet.AsSpan<byte>(offset, PacketHeader.HeaderSize));
-            offset += PacketHeader.HeaderSize;
+            SerializePacketHeader(id, data.Length, packet.AsSpan<byte>(position, PacketHeader.HeaderSize));
+            position += PacketHeader.HeaderSize;
             
             // copy data
-            Array.Copy(data, 0, packet, offset, data.Length);
+            Array.Copy(data, 0, packet, position, data.Length);
 
             return packet;
         }
@@ -93,55 +92,72 @@ namespace CoreModule
 
     public class InitialWorldStatePacket : IPacket
     {
-        public int PacketSize
-        {
-            get
-            {
-                return sizeof(int) + WorldStateData.Length;
-            }
-        }
+        public int PacketSize { get; } = 0;
 
         public int AllocatedPlayerID { get; set; } = 0;
-        public byte[] WorldStateData { get; set; } = null!;
+        public byte[]? WorldStateData { get; set; } = null;
 
-        public InitialWorldStatePacket(int allocatedPlayerId, byte[] worldStateData)
+        public InitialWorldStatePacket(int allocatedPlayerId, byte[]? worldStateData)
         {
             AllocatedPlayerID = allocatedPlayerId;
             WorldStateData = worldStateData;
+
+            PacketSize = (WorldStateData is null ? sizeof(int) : sizeof(int) + WorldStateData.Length);
         }
 
-        public InitialWorldStatePacket(byte[] data) => DeserializeData(data);
+        public InitialWorldStatePacket(byte[] data)
+        {
+            DeserializeData(data);
+            PacketSize = (WorldStateData is null ? sizeof(int) : sizeof(int) + WorldStateData.Length);
+        }
 
         public byte[] SerializeData()
         {
-            byte[] ret = new byte[sizeof(int) + WorldStateData.Length];
-            int offset = 0;
+            byte[] result;
+            int position = 0;
 
-            // serialize allocated player ID
-            Span<byte> playerIdBufferViewer = new Span<byte>(ret, offset, sizeof(int));
-            BitConverter.TryWriteBytes(playerIdBufferViewer, AllocatedPlayerID);
-            offset += sizeof(int);
+            if (WorldStateData == null)
+            {
+                result = new byte[sizeof(int)];
 
-            // copy world state data
-            Array.Copy(WorldStateData, 0, ret, offset, WorldStateData.Length);
+                // serialize allocated player ID
+                Span<byte> playerIdBufferViewer = new Span<byte>(result, position, sizeof(int));
+                BitConverter.TryWriteBytes(playerIdBufferViewer, AllocatedPlayerID);
+                position += sizeof(int);
+            }
+            else
+            {
+                result = new byte[sizeof(int) + WorldStateData.Length];
 
-            return ret;
+                // serialize allocated player ID
+                Span<byte> playerIdBufferViewer = new Span<byte>(result, position, sizeof(int));
+                BitConverter.TryWriteBytes(playerIdBufferViewer, AllocatedPlayerID);
+                position += sizeof(int);
+
+                // copy world state data
+                Array.Copy(WorldStateData, 0, result, position, WorldStateData.Length);
+            }
+
+            return result;
         }
 
         public void DeserializeData(byte[] buffer)
         {
-            if (WorldStateData is null)
+            if (AllocatedPlayerID is 0)
             {
-                int offset = 0;
+                int position = 0;
 
                 // deserialize allocated player ID
-                Span<byte> playerIdBufferViewer = new Span<byte>(buffer, offset, sizeof(int));
+                Span<byte> playerIdBufferViewer = new Span<byte>(buffer, position, sizeof(int));
                 AllocatedPlayerID = MemoryMarshal.Read<int>(playerIdBufferViewer);
-                offset += sizeof(int);
+                position += sizeof(int);
 
-                // copy world state data
-                WorldStateData = new byte[buffer.Length - offset];
-                Array.Copy(buffer, offset, WorldStateData, 0, WorldStateData.Length);
+                if (buffer.Length - position > 0)
+                {
+                    // copy world state data
+                    WorldStateData = new byte[buffer.Length - position];
+                    Array.Copy(buffer, position, WorldStateData, 0, WorldStateData.Length);
+                }
             }
         }
     }
@@ -180,41 +196,41 @@ namespace CoreModule
             if (PlayerID is 0)
             {
                 Transform = new float[TransformSize];
-                int offset = 0;
+                int position = 0;
 
                 // deserialize Player ID
-                ReadOnlySpan<byte> playerIDViewer = data.AsSpan<byte>(offset, sizeof(int));
+                ReadOnlySpan<byte> playerIDViewer = data.AsSpan<byte>(position, sizeof(int));
                 PlayerID = MemoryMarshal.Read<int>(playerIDViewer);
-                offset += data.Length;
+                position += sizeof(int);
 
                 // deserialize Transform
-                for (int i = 0; i < 10; ++i)
+                for (int i = 0; i < TransformSize; ++i)
                 {
-                    ReadOnlySpan<byte> transformElementViewer = data.AsSpan<byte>(offset, sizeof(float));
+                    ReadOnlySpan<byte> transformElementViewer = data.AsSpan<byte>(position, sizeof(float));
                     Transform[i] = MemoryMarshal.Read<float>(transformElementViewer);
-                    offset += sizeof(float);
+                    position += sizeof(float);
                 }
             }
         }
 
         public byte[] SerializeData()
         {
-            byte[] buffer = new byte[PacketSize];
-            int offset = 0;
-            Span<byte> data = new Span<byte>(buffer);
+            byte[] result = new byte[PacketSize];
+            int position = 0;
+            Span<byte> data = new Span<byte>(result);
 
             // serialize Player ID
-            BitConverter.TryWriteBytes(data.Slice(offset, sizeof(int)), PlayerID);
-            offset += sizeof(int);
+            BitConverter.TryWriteBytes(data.Slice(position, sizeof(int)), PlayerID);
+            position += sizeof(int);
 
             // serialize transform
             for (int i = 0; i < Transform.Length; ++i)
             {
-                BitConverter.TryWriteBytes(data.Slice(offset, sizeof(float)), Transform[i]);
-                offset += sizeof(float);
+                BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), Transform[i]);
+                position += sizeof(float);
             }
 
-            return buffer;
+            return result;
         }
     }
 
@@ -237,34 +253,36 @@ namespace CoreModule
 
         public void DeserializeData(byte[] data)
         {
-            if (AttackPlayerID is 0)
+            if (AttackPlayerID == 0)
             {
-                int offset = 0;
+                int position = 0;
 
                 // deserialize attack player ID
-                BitConverter.TryWriteBytes(data.AsSpan<byte>().Slice(offset, sizeof(int)), AttackPlayerID);
-                offset += sizeof(int);
+                ReadOnlySpan<byte> attackPlayerIDViewer = data.AsSpan<byte>(position, sizeof(int));
+                AttackPlayerID = MemoryMarshal.Read<int>(attackPlayerIDViewer);
+                position += sizeof(int);
 
                 // deserialize hit monster ID
-                BitConverter.TryWriteBytes(data.AsSpan<byte>().Slice(offset, sizeof(int)), HitMonsterID);
-                offset += sizeof(int);
+                ReadOnlySpan<byte> hitMonsterIDViewer = data.AsSpan<byte>(position, sizeof(int));
+                HitMonsterID = MemoryMarshal.Read<int>(hitMonsterIDViewer);
+                position += sizeof(int);
             }
         }
 
         public byte[] SerializeData()
         {
-            byte[] ret = new byte[PacketSize];
-            int offset = 0;
+            byte[] result = new byte[PacketSize];
+            int position = 0;
 
             // serialize attack player ID
-            BitConverter.TryWriteBytes(ret.AsSpan<byte>().Slice(offset, sizeof(int)), AttackPlayerID);
-            offset += sizeof(int);
+            BitConverter.TryWriteBytes(result.AsSpan<byte>().Slice(position, sizeof(int)), AttackPlayerID);
+            position += sizeof(int);
 
             // serialize hit monster ID
-            BitConverter.TryWriteBytes(ret.AsSpan<byte>().Slice(offset, sizeof(int)), HitMonsterID);
-            offset += sizeof(int);
+            BitConverter.TryWriteBytes(result.AsSpan<byte>().Slice(position, sizeof(int)), HitMonsterID);
+            position += sizeof(int);
 
-            return ret;
+            return result;
         }
     }
 

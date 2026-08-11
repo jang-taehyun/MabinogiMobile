@@ -1,6 +1,7 @@
 ﻿#nullable enable
 
 using CoreModule;
+using System;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -19,12 +20,14 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    private Socket socket = null!;
+    private Socket? socket = null;
     private const string ServerIP = "127.0.0.1";
     private const int ServerPort = 33355;
 
     void Awake()
     {
+        Debug.Log($"Log Path: {Application.consoleLogPath}");
+
         // connect server
         socket = new Socket(addressFamily: AddressFamily.InterNetwork, socketType: SocketType.Stream, protocolType: ProtocolType.Tcp);
 
@@ -36,15 +39,12 @@ public class NetworkManager : MonoBehaviour
         _ = ConnectServer();
     }
 
-    private void Update()
-    {
-        _ = ReadPacket();
-    }
-
     private async Task ConnectServer()
     {
         await socket.ConnectAsync(ServerIP, ServerPort);
         Debug.Log("Server connected!");
+
+        await ReadPacket();
     }
 
     public async Task SendPacket(PacketID id, byte[] data)
@@ -52,51 +52,57 @@ public class NetworkManager : MonoBehaviour
         byte[] packet = PacketHeader.AppendHeader(id, data);
         int writeLen = 0;
         while (writeLen < packet.Length)
-            writeLen += await socket.SendAsync(packet[writeLen..], SocketFlags.None);
+            writeLen += await socket.SendAsync(packet.AsMemory<byte>(writeLen), SocketFlags.None);
     }
 
     public async Task ReadPacket()
     {
         // read header
         byte[] header = new byte[PacketHeader.HeaderSize];
-        int readLen = 0;
-        while (readLen < header.Length)
+
+        while (true)
         {
-            readLen += await socket.ReceiveAsync(header[readLen..], SocketFlags.None);
-            
-            // disconnected server
-            if (readLen == 0)
+            // read header
+            int readLength = 0;
+            while (readLength < header.Length)
             {
-                DisconnectedToServer();
-                return;
+                int length = await socket.ReceiveAsync(header.AsMemory<byte>(readLength), SocketFlags.None);
+                readLength += length;
+
+                // disconnected server
+                if (length == 0)
+                {
+                    DisconnectedToServer();
+                    return;
+                }
             }
+
+            // deserialize header
+            PacketID id = PacketID.Unknown;
+            int dataSize = 0;
+            PacketHeader.DeserializePacketHeader(header, out id, out dataSize);
+
+            // read data
+            byte[] data = new byte[dataSize];
+            readLength = 0;
+            while (readLength < data.Length)
+                readLength += await socket.ReceiveAsync(data.AsMemory<byte>(readLength), SocketFlags.None);
+
+            // create packet handler & enter job queue
+            GameManager.Instance.JobQueue.Enqueue(PacketHandler.Generator[id].Invoke(data));
         }
 
-        // deserialize header
-
-        PacketID id = PacketID.Unknown;
-        int dataSize = 0;
-        PacketHeader.DeserializePacketHeader(header, out id, out dataSize);
-
-        // read data
-        byte[] data = new byte[dataSize];
-        readLen = 0;
-        while (readLen < data.Length)
-            readLen += await socket.ReceiveAsync(data[readLen..], SocketFlags.None);
-
-        // create packet handler & enter job queue
-        GameManager.Instance.JobQueue.Enqueue(PacketHandler.Generator[id].Invoke(data));
     }
 
     private void DisconnectedToServer()
     {
         Debug.Log("서버와 연결이 끊겼습니다.");
-        OnDestroy();
     }
 
     void OnDestroy()
     {
         socket?.Shutdown(SocketShutdown.Both);
         socket?.Close();
+        socket = null;
     }
 }

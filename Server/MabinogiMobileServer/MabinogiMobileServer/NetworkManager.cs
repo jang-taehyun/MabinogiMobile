@@ -1,6 +1,5 @@
 ﻿using CoreModule;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -22,95 +21,152 @@ namespace MabinogiMobileServer
             }
         }
 
+        // listen socket //
         Listener listener = Listener.Instance;
-
         public void RunServer() => listener.Run();
 
+        // accept //
         public async Task AcceptClient()
         {
-            // accept new client
-            Socket newClient = await listener.AcceptClient();
-
-            // allocate player ID to New client
-            int newPlayerID = new Random().Next(1, 100);
-            while (GameManager.Instance.ConntectedClient.ContainsKey(newPlayerID) is true)
-                newPlayerID = new Random().Next(1, 100);
-
-            // create & add new player
-            Player newPlayer = new Player()
+            while(true)
             {
-                sock = newClient,
-                PlayerID = newPlayerID,
-            };
-            GameManager.Instance.AddPlayer(newPlayer);
-            Console.WriteLine($"New Client connected : {newPlayerID}");
+                // accept new client
+                Socket newClient = await listener.AcceptClient();
 
-            // send world state to new player
-            IPacket initWorldStatePacket = new InitialWorldStatePacket(newPlayerID, GameManager.Instance.SerializePlayerInfomations(newPlayer));
-            await SendPacket(PacketID.InitialWorldState, initWorldStatePacket, newClient);
+                // create accept process
+                var acceptProcess = new
+                {
+                    Process = (Action)(
+                        delegate ()
+                        {
+                            // allocate player ID to New client
+                            int newPlayerID = new Random().Next(1, 100);
+                            while (GameManager.Instance.ConntectedClient.ContainsKey(newPlayerID) is true)
+                                newPlayerID = new Random().Next(1, 100);
 
-            // broadcast packet that new client connected
-            TransformPacket newPlayerInfoPacket = new TransformPacket(newPlayer.PlayerID, newPlayer.Transform);
-            await Broadcast(PacketID.Transform, newPlayerInfoPacket, newPlayer.PlayerID);
+                            // create & add new player
+                            Player newPlayer = new Player()
+                            {
+                                ClientSocket = newClient,
+                                PlayerID = newPlayerID,
+                            };
+                            GameManager.Instance.AddPlayer(newPlayer);
+                            Console.WriteLine($"New Client connected : {newPlayerID}");
+
+                            // send world state to new player
+                            IPacket initWorldStatePacket = new InitialWorldStatePacket(newPlayerID, GameManager.Instance.SerializePlayerInfomations(newPlayer));
+                            _ = SendPacket(PacketID.InitialWorldState, initWorldStatePacket, newClient);
+
+                            // broadcast packet that new client connected
+                            TransformPacket newPlayerInfoPacket = new TransformPacket(newPlayer.PlayerID, newPlayer.Transform);
+                            Broadcast(PacketID.Transform, newPlayerInfoPacket, newPlayer.PlayerID);
+
+                            // create read loop
+                            _ = ReadPacket(newPlayer);
+                        }
+                    )
+                };
+
+                // enter accept process to job queue
+                GameManager.Instance.JobQueue.Enqueue(acceptProcess);
+            }
         }
 
-        public async Task ReadPacket(Player player)
+        // read //
+        private async Task ReadPacket(Player player)
         {
             // read header
             byte[] header = new byte[PacketHeader.HeaderSize];
-            int readLen = 0;
-            while (readLen < header.Length)
-            {
-                readLen += await player.sock.ReceiveAsync(header[readLen..]);
 
-                // close client
-                if (readLen is 0)
+            try
+            {
+                while (true)
                 {
-                    await CloseClientSocket(player);
-                    return;
+                    int readLength = 0;
+                    while (readLength < header.Length)
+                    {
+                        int length = await player.ClientSocket.ReceiveAsync(header.AsMemory<byte>(readLength));
+                        readLength += length;
+
+                        // close client
+                        if (length is 0)
+                        {
+                            // enter close process to job queue
+                            var closeClientProcess = new
+                            {
+                                Process = (Action)delegate ()
+                                {
+                                    CloseClientSocket(player);
+                                    Console.WriteLine($"client close {player.PlayerID}");
+                                }
+                            };
+                            GameManager.Instance.JobQueue.Enqueue(closeClientProcess);
+
+                            return;
+                        }
+                    }
+
+                    // deserialize header
+                    PacketID id = PacketID.Unknown;
+                    int dataSize = 0;
+                    PacketHeader.DeserializePacketHeader(header, out id, out dataSize);
+
+                    // read data
+                    byte[] data = new byte[dataSize];
+                    readLength = 0;
+                    while (readLength < data.Length)
+                        readLength += await player.ClientSocket.ReceiveAsync(data.AsMemory<byte>(readLength));
+
+                    // create packet handler & enter job queue
+                    GameManager.Instance.JobQueue.Enqueue(PacketHandler.Generator[id].Invoke(data));
                 }
             }
-
-            // deserialize header
-            PacketID id = PacketID.Unknown;
-            int dataSize = 0;
-            PacketHeader.DeserializePacketHeader(header, out id, out dataSize);
-
-            // read data
-            byte[] data = new byte[dataSize];
-            readLen = 0;
-            while (readLen < data.Length)
-                readLen += await player.sock.ReceiveAsync(data[readLen..]);
-
-            // create packet handler & enter job queue
-            GameManager.Instance.JobQueue.Enqueue(PacketHandler.Generator[id].Invoke(data));
+            catch(SocketException e)
+            {
+                Console.WriteLine($"exception in read packet {player.PlayerID}, error code : {e.ErrorCode}");
+                Console.WriteLine(e.Message);
+            }
+            finally
+            {
+                // enter close process to job queue
+                var closeClientProcess = new
+                {
+                    Process = (Action)delegate ()
+                    {
+                        CloseClientSocket(player);
+                        Console.WriteLine($"client close {player.PlayerID}");
+                    }
+                };
+                GameManager.Instance.JobQueue.Enqueue(closeClientProcess);
+            }
         }
 
+        // write //
         public async Task SendPacket(PacketID id, IPacket data, Socket client)
         {
             byte[] packet = PacketHeader.AppendHeader(id, data.SerializeData());
             int sendLen = 0;
             while (sendLen < packet.Length)
-                sendLen += await client.SendAsync(packet[sendLen..]);
+                sendLen += await client.SendAsync(packet.AsMemory<byte>(sendLen));
         }
-
-        public async Task Broadcast(PacketID id, IPacket data, int? excludeID = null)
+        public void Broadcast(PacketID id, IPacket data, int? excludeID = null)
         {
             foreach(var item in GameManager.Instance.ConntectedClient)
             {
                 if(excludeID is null || (excludeID is not null && item.Key != excludeID))
                 {
-                    await SendPacket(id, data, item.Value.sock);
+                    _= SendPacket(id, data, item.Value.ClientSocket);
                 }
             }
         }
 
-        public async Task CloseClientSocket(Player disconnectedPlayer)
+        // close //
+        public void CloseClientSocket(Player disconnectedPlayer)
         {
             Console.WriteLine($"[close client] : {disconnectedPlayer.PlayerID}");
             GameManager.Instance.RemovePlayer(disconnectedPlayer);
 
-            await Broadcast(PacketID.CloseClient, new CloseClientPacket(disconnectedPlayer.PlayerID));
+            Broadcast(PacketID.CloseClient, new CloseClientPacket(disconnectedPlayer.PlayerID));
         }
 
         // Listener class

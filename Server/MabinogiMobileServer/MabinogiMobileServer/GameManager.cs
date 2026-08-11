@@ -27,17 +27,20 @@ namespace MabinogiMobileServer
         public void ModifyPlayerTransform(int playerId, float[] transform) => connectedClient[playerId].Transform = transform;
 
         // serialize //
-        public byte[] SerializePlayerInfomations(Player? excludePlayer = null)
+        public byte[]? SerializePlayerInfomations(Player? excludePlayer = null)
         {
-            byte[] result = new byte[ConntectedClient.Count * Player.SerializeSize];
-            int offset = 0;
+            if (connectedClient.Count <= 1)
+                return null;
+
+            byte[] result = new byte[(ConntectedClient.Count - 1) * Player.SerializeSize];
+            int position = 0;
 
             foreach (var player in ConntectedClient.Values)
             {
                 if(excludePlayer is null || excludePlayer.PlayerID != player.PlayerID)
                 {
-                    player.SerializePlayerInfo(result.AsSpan<byte>(offset, Player.SerializeSize));
-                    offset += Player.SerializeSize;
+                    player.SerializePlayerInfo(result.AsSpan<byte>(position, Player.SerializeSize));
+                    position += Player.SerializeSize;
                 }
             }
 
@@ -45,7 +48,7 @@ namespace MabinogiMobileServer
         }
 
         // manage job //
-        public Queue<dynamic> JobQueue { get; private set; } = new Queue<dynamic>();
+        public Queue<dynamic> JobQueue { get; } = new Queue<dynamic>();
         public void RunJob()
         {
             int runCount = JobQueue.Count;

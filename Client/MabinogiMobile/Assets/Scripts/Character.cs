@@ -5,7 +5,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using CoreModule;
 using UnityEngine.Rendering.Universal;
-using System.Threading.Tasks;
 
 public class Character : MonoBehaviour
 {
@@ -67,7 +66,7 @@ public class Character : MonoBehaviour
             offset += sizeof(int);
             // ------------------
 
-            _ = NetworkManager.Instance.SendPacket(PacketID.Attack, BitConverter.GetBytes(PlayerID));
+            _ = NetworkManager.Instance.SendPacket(PacketID.Attack, data);
         }
     }
     public void OutputAttackAnimation()
@@ -177,12 +176,15 @@ public class Character : MonoBehaviour
             transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w
         };
 
-        byte[] ret = new byte[transformData.Length * sizeof(float)];
-        int offset = 0;
+        byte[] ret = new byte[sizeof(int) + transformData.Length * sizeof(float)];
+        int position = 0;
+        BitConverter.TryWriteBytes(ret.AsSpan<byte>(position, sizeof(int)), PlayerID);
+        position += sizeof(int);
+
         for (int i = 0; i < transformData.Length; ++i)
         {
-            BitConverter.TryWriteBytes(ret.AsSpan<byte>(offset, sizeof(float)), transformData[i]);
-            offset += sizeof(float);
+            BitConverter.TryWriteBytes(ret.AsSpan<byte>(position, sizeof(float)), transformData[i]);
+            position += sizeof(float);
         }
 
         return ret;

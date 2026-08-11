@@ -3,7 +3,6 @@
 using CoreModule;
 using System;
 using System.Collections.Generic;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using static Character;
@@ -44,35 +43,38 @@ public class InitialWorldStatePacketHandler : IPacketHandler
         GameManager.Instance.SpanwLocalPlayer();
 
         // spawn remote player
-        int offset = Character.SerializeLength;
-        int pos = 0;
-        int playerId = 0;
-        float[] transform = new float[(int)TransformElement.element];
-        while (pos < packet.WorldStateData.Length)
+        if (packet.WorldStateData is not null)
         {
-            Span<byte> remotePlayerData = new Span<byte>(packet.WorldStateData, pos, offset);
-            int innerPos = 0;
-
-            // read remote player ID
-            playerId = MemoryMarshal.Read<int>(remotePlayerData.Slice(innerPos, sizeof(int)));
-            innerPos += sizeof(int);
-
-            // read remote player's character transform
-            for (int i = 0; i < transform.Length; ++i)
+            int offset = Character.SerializeLength;
+            int pos = 0;
+            int playerId = 0;
+            float[] transform = new float[(int)TransformElement.element];
+            while (pos < packet.WorldStateData.Length)
             {
-                transform[i] = MemoryMarshal.Read<float>(remotePlayerData.Slice(innerPos, sizeof(float)));
-                innerPos += sizeof(float);
+                Span<byte> remotePlayerData = new Span<byte>(packet.WorldStateData, pos, offset);
+                int innerPos = 0;
+
+                // read remote player ID
+                playerId = MemoryMarshal.Read<int>(remotePlayerData.Slice(innerPos, sizeof(int)));
+                innerPos += sizeof(int);
+
+                // read remote player's character transform
+                for (int i = 0; i < transform.Length; ++i)
+                {
+                    transform[i] = MemoryMarshal.Read<float>(remotePlayerData.Slice(innerPos, sizeof(float)));
+                    innerPos += sizeof(float);
+                }
+
+                // spawn remote player's character
+                GameManager.Instance.SpawnRemotePlayer(
+                    playerId,
+                    new Vector3(transform[0], transform[1], transform[2]),
+                    new Quaternion(transform[3], transform[4], transform[5], transform[6])
+                );
+
+                // increate pos
+                pos += offset;
             }
-
-            // spawn remote player's character
-            GameManager.Instance.SpawnRemotePlayer(
-                playerId,
-                new Vector3(transform[0], transform[1], transform[2]),
-                new Quaternion(transform[3], transform[4], transform[5], transform[6])
-            );
-
-            // increate pos
-            pos += offset;
         }
     }
 }
@@ -127,5 +129,8 @@ public class CloseClientPacketHandler : IPacketHandler
 
     public CloseClientPacketHandler(byte[] Buffer) => Packet = new CloseClientPacket(Buffer);
 
-    public void Process() => GameManager.Instance.RemoveRemotePlayer(((CloseClientPacket)Packet).DisconnectedPlayerID);
+    public void Process()
+    {
+        GameManager.Instance.RemoveRemotePlayer(((CloseClientPacket)Packet).DisconnectedPlayerID);
+    }
 }

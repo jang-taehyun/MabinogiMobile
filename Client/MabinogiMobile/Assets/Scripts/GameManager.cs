@@ -54,7 +54,7 @@ public class GameManager : MonoBehaviour
     public void SpawnRemotePlayer(int RemotePlayerID, Vector3 position, Quaternion rotation)
     {
         Players.Add(RemotePlayerID, CharacterSpawner.SpawnCharacter(RemotePlayerID, position, rotation));
-        Debug.Log($"[my ID {LocalPlayerID}] : create player {RemotePlayerID}");
+        Debug.Log($"[my ID {LocalPlayerID}] : create remote player {RemotePlayerID}");
     }
     public void SpanwLocalPlayer()
     {
@@ -64,7 +64,7 @@ public class GameManager : MonoBehaviour
     }
 
     // manage job //
-    public Queue<IPacketHandler> JobQueue { get; private set; } = new Queue<IPacketHandler>();
+    public Queue<IPacketHandler> JobQueue { get; } = new Queue<IPacketHandler>();
     private void RunJob()
     {
         int runCount = JobQueue.Count;

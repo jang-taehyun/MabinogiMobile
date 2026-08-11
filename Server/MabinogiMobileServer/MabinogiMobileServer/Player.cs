@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Net.Sockets;
 
 namespace MabinogiMobileServer
@@ -16,31 +15,32 @@ namespace MabinogiMobileServer
 
         public required int PlayerID { get; init; }
 
+        [Obsolete("temp code", false)]
         private const int TransformCount = 7;
-        public float[] Transform { get; set; } = null!;
+        public float[] Transform { get; set; } = new float[TransformCount];
 
-        public required Socket sock { get; init; }
+        public required Socket ClientSocket { get; init; }
 
         public void SerializePlayerInfo(Span<byte> buffer)
         {
-            int offset = 0;
+            int position = 0;
 
             // serialize player ID
-            BitConverter.TryWriteBytes(buffer.Slice(offset, sizeof(int)), PlayerID);
-            offset += sizeof(int);
+            BitConverter.TryWriteBytes(buffer.Slice(position, sizeof(int)), PlayerID);
+            position += sizeof(int);
 
             // serialize transform
             foreach (float value in Transform)
             {
-                BitConverter.TryWriteBytes(buffer.Slice(offset, sizeof(float)), value);
-                offset += sizeof(float);
+                BitConverter.TryWriteBytes(buffer.Slice(position, sizeof(float)), value);
+                position += sizeof(float);
             }
         }
 
         public void Dispose()
         {
-            sock.Shutdown(SocketShutdown.Both);
-            sock.Close();
+            ClientSocket.Shutdown(SocketShutdown.Both);
+            ClientSocket.Close();
         }
     }
 }
