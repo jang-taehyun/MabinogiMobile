@@ -33,42 +33,43 @@ namespace MabinogiMobileServer
                 // accept new client
                 Socket newClient = await listener.AcceptClient();
 
+                // allocate player ID to New client
+                // todo : temp code
+                int newPlayerID = new Random().Next(1, 100);
+                while (PlayerManager.Instance[newPlayerID] is not null)
+                    newPlayerID = new Random().Next(1, 100);
+
+                // create & add new player
+                Player newPlayer = new Player()
+                {
+                    ClientSocket = newClient,
+                    PlayerID = newPlayerID,
+                };
+                PlayerManager.Instance.AddPlayer(newPlayer);
+                Console.WriteLine($"New Client connected : {newPlayerID}");
+
                 // create accept process
                 var acceptProcess = new
                 {
-                    Process = (Action)(
-                        delegate ()
-                        {
-                            // allocate player ID to New client
-                            int newPlayerID = new Random().Next(1, 100);
-                            while (GameManager.Instance.ConntectedClient.ContainsKey(newPlayerID) is true)
-                                newPlayerID = new Random().Next(1, 100);
+                    Process = (Action)delegate ()
+                    {
+                        Player player = PlayerManager.Instance[newPlayerID]!;
 
-                            // create & add new player
-                            Player newPlayer = new Player()
-                            {
-                                ClientSocket = newClient,
-                                PlayerID = newPlayerID,
-                            };
-                            GameManager.Instance.AddPlayer(newPlayer);
-                            Console.WriteLine($"New Client connected : {newPlayerID}");
+                        // send world state to new player
+                        IPacket initWorldStatePacket = new InitialWorldStatePacket(newPlayerID, PlayerManager.Instance.SerializePlayerInfomations(player));
+                        _ = NetworkManager.Instance.SendPacket(PacketID.InitialWorldState, initWorldStatePacket, player.ClientSocket);
 
-                            // send world state to new player
-                            IPacket initWorldStatePacket = new InitialWorldStatePacket(newPlayerID, GameManager.Instance.SerializePlayerInfomations(newPlayer));
-                            _ = SendPacket(PacketID.InitialWorldState, initWorldStatePacket, newClient);
+                        // broadcast packet that new client connected
+                        TransformPacket newPlayerInfoPacket = new TransformPacket(player.PlayerID, player.Transform);
+                        NetworkManager.Instance.Broadcast(PacketID.Transform, newPlayerInfoPacket, player.PlayerID);
 
-                            // broadcast packet that new client connected
-                            TransformPacket newPlayerInfoPacket = new TransformPacket(newPlayer.PlayerID, newPlayer.Transform);
-                            Broadcast(PacketID.Transform, newPlayerInfoPacket, newPlayer.PlayerID);
-
-                            // create read loop
-                            _ = ReadPacket(newPlayer);
-                        }
-                    )
+                        // create read loop
+                        _ = ReadPacket(player);
+                    }
                 };
 
                 // enter accept process to job queue
-                GameManager.Instance.JobQueue.Enqueue(acceptProcess);
+                JobManager.Instance.EnqueueJob(acceptProcess);
             }
         }
 
@@ -90,20 +91,7 @@ namespace MabinogiMobileServer
 
                         // close client
                         if (length is 0)
-                        {
-                            // enter close process to job queue
-                            var closeClientProcess = new
-                            {
-                                Process = (Action)delegate ()
-                                {
-                                    CloseClientSocket(player);
-                                    Console.WriteLine($"client close {player.PlayerID}");
-                                }
-                            };
-                            GameManager.Instance.JobQueue.Enqueue(closeClientProcess);
-
-                            return;
-                        }
+                            break;
                     }
 
                     // deserialize header
@@ -118,7 +106,7 @@ namespace MabinogiMobileServer
                         readLength += await player.ClientSocket.ReceiveAsync(data.AsMemory<byte>(readLength));
 
                     // create packet handler & enter job queue
-                    GameManager.Instance.JobQueue.Enqueue(PacketHandler.Generator[id].Invoke(data));
+                    JobManager.Instance.EnqueueJob(PacketHandler.Generator[id].Invoke(data));
                 }
             }
             catch(SocketException e)
@@ -129,15 +117,17 @@ namespace MabinogiMobileServer
             finally
             {
                 // enter close process to job queue
+                int disconnectedPlayerId = player.PlayerID;
                 var closeClientProcess = new
                 {
                     Process = (Action)delegate ()
                     {
-                        CloseClientSocket(player);
-                        Console.WriteLine($"client close {player.PlayerID}");
+                        Player disconnectedPlayer = PlayerManager.Instance[disconnectedPlayerId]!;
+                        CloseClientSocket(disconnectedPlayer);
+                        Console.WriteLine($"client close {disconnectedPlayerId}");
                     }
                 };
-                GameManager.Instance.JobQueue.Enqueue(closeClientProcess);
+                JobManager.Instance.EnqueueJob(closeClientProcess);
             }
         }
 
@@ -151,11 +141,11 @@ namespace MabinogiMobileServer
         }
         public void Broadcast(PacketID id, IPacket data, int? excludeID = null)
         {
-            foreach(var item in GameManager.Instance.ConntectedClient)
+            foreach(Player player in PlayerManager.Instance)
             {
-                if(excludeID is null || (excludeID is not null && item.Key != excludeID))
+                if(excludeID is null || (excludeID is not null && player.PlayerID != excludeID))
                 {
-                    _= SendPacket(id, data, item.Value.ClientSocket);
+                    _= SendPacket(id, data, player.ClientSocket);
                 }
             }
         }
@@ -164,7 +154,7 @@ namespace MabinogiMobileServer
         public void CloseClientSocket(Player disconnectedPlayer)
         {
             Console.WriteLine($"[close client] : {disconnectedPlayer.PlayerID}");
-            GameManager.Instance.RemovePlayer(disconnectedPlayer);
+            PlayerManager.Instance.RemovePlayer(disconnectedPlayer.PlayerID);
 
             Broadcast(PacketID.CloseClient, new CloseClientPacket(disconnectedPlayer.PlayerID));
         }

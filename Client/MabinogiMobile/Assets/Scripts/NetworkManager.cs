@@ -26,8 +26,6 @@ public class NetworkManager : MonoBehaviour
 
     void Awake()
     {
-        Debug.Log($"Log Path: {Application.consoleLogPath}");
-
         // connect server
         socket = new Socket(addressFamily: AddressFamily.InterNetwork, socketType: SocketType.Stream, protocolType: ProtocolType.Tcp);
 
@@ -89,7 +87,7 @@ public class NetworkManager : MonoBehaviour
                 readLength += await socket.ReceiveAsync(data.AsMemory<byte>(readLength), SocketFlags.None);
 
             // create packet handler & enter job queue
-            GameManager.Instance.JobQueue.Enqueue(PacketHandler.Generator[id].Invoke(data));
+            GameManager.Instance.EnqueueJob(PacketHandler.Generator[id].Invoke(data));
         }
 
     }

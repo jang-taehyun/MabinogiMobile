@@ -25,7 +25,7 @@ namespace CoreModule
 
     public interface IPacket
     {
-        int PacketSize { get; }
+        int DataSize { get; }
         byte[] SerializeData();
         void DeserializeData(byte[] data);
     }
@@ -92,7 +92,7 @@ namespace CoreModule
 
     public class InitialWorldStatePacket : IPacket
     {
-        public int PacketSize { get; } = 0;
+        public int DataSize { get; } = 0;
 
         public int AllocatedPlayerID { get; set; } = 0;
         public byte[]? WorldStateData { get; set; } = null;
@@ -102,13 +102,13 @@ namespace CoreModule
             AllocatedPlayerID = allocatedPlayerId;
             WorldStateData = worldStateData;
 
-            PacketSize = (WorldStateData is null ? sizeof(int) : sizeof(int) + WorldStateData.Length);
+            DataSize = (WorldStateData is null ? sizeof(int) : sizeof(int) + WorldStateData.Length);
         }
 
         public InitialWorldStatePacket(byte[] data)
         {
             DeserializeData(data);
-            PacketSize = (WorldStateData is null ? sizeof(int) : sizeof(int) + WorldStateData.Length);
+            DataSize = (WorldStateData is null ? sizeof(int) : sizeof(int) + WorldStateData.Length);
         }
 
         public byte[] SerializeData()
@@ -176,7 +176,7 @@ namespace CoreModule
         public float RotationZ => Transform[5];
         public float RotationW => Transform[6];
 
-        public int PacketSize
+        public int DataSize
         {
             get
             {
@@ -215,7 +215,7 @@ namespace CoreModule
 
         public byte[] SerializeData()
         {
-            byte[] result = new byte[PacketSize];
+            byte[] result = new byte[DataSize];
             int position = 0;
             Span<byte> data = new Span<byte>(result);
 
@@ -236,7 +236,7 @@ namespace CoreModule
 
     public class AttackPacket : IPacket
     {
-        public int PacketSize
+        public int DataSize
         {
             get { return sizeof(int) + sizeof(int); }
         }
@@ -271,7 +271,7 @@ namespace CoreModule
 
         public byte[] SerializeData()
         {
-            byte[] result = new byte[PacketSize];
+            byte[] result = new byte[DataSize];
             int position = 0;
 
             // serialize attack player ID
@@ -288,7 +288,7 @@ namespace CoreModule
 
     public class CloseClientPacket : IPacket
     {
-        public int PacketSize
+        public int DataSize
         {
             get { return sizeof(int); }
         }

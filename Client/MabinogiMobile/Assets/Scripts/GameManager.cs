@@ -2,6 +2,7 @@
 
 using CoreModule;
 using System.Collections.Generic;
+using Unity.AppUI.Core;
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
@@ -64,13 +65,31 @@ public class GameManager : MonoBehaviour
     }
 
     // manage job //
-    public Queue<IPacketHandler> JobQueue { get; } = new Queue<IPacketHandler>();
+    private Queue<IPacketHandler> jobQueue = new Queue<IPacketHandler>();
+    private object jobQueueLock = new object();
+    public void EnqueueJob(IPacketHandler handler)
+    {
+        lock (jobQueueLock)
+        {
+            jobQueue.Enqueue(handler);
+        }
+    }
     private void RunJob()
     {
-        int runCount = JobQueue.Count;
+        int runCount = 0;
+        lock (jobQueueLock)
+        {
+            runCount = jobQueue.Count;
+        }
+
+        IPacketHandler job = null!;
         while (runCount > 0)
         {
-            IPacketHandler job = JobQueue.Dequeue();
+            lock (jobQueueLock)
+            {
+                job = jobQueue.Dequeue();
+            }
+
             job.Process();
             --runCount;
         }

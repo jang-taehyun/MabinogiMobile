@@ -43,7 +43,7 @@ namespace MabinogiMobileServer
         public void Process()
         {
             TransformPacket packet = (TransformPacket)Packet;
-            GameManager.Instance.ModifyPlayerTransform(packet.PlayerID, packet.Transform);
+            PlayerManager.Instance.ModifyPlayerTransform(packet.PlayerID, packet.Transform);
             NetworkManager.Instance.Broadcast(PacketID.Transform, packet, packet.PlayerID);
         }
     }

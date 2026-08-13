@@ -13,7 +13,7 @@ namespace MabinogiMobileServer
 
             // process job
             while (true)
-                GameManager.Instance.RunJob();
+                JobManager.Instance.RunJob();
         }
     }
 }
