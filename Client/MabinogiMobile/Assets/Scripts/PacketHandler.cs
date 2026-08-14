@@ -24,6 +24,7 @@ public class PacketHandler
         { PacketID.Transform,           (byte[] data) => new TransformPacketHandler(data)          },
         { PacketID.Attack,              (byte[] data) => new AttackPacketHandler(data)             },
         { PacketID.CloseClient,         (byte[] data) => new CloseClientPacketHandler(data)        },
+        { PacketID.PlayerMoveStart,     (byte[] data) => new PlayerMoveStartPacketHandler(data)    },
     };
     public static IReadOnlyDictionary<PacketID, Func<byte[], IPacketHandler>> Generator => generator;
 }
@@ -132,5 +133,17 @@ public class CloseClientPacketHandler : IPacketHandler
     public void Process()
     {
         GameManager.Instance.RemoveRemotePlayer(((CloseClientPacket)Packet).DisconnectedPlayerID);
+    }
+}
+
+public class PlayerMoveStartPacketHandler : IPacketHandler
+{
+    public IPacket Packet { get; }
+
+    public PlayerMoveStartPacketHandler(byte[] Buffer) => Packet = new PlayerMoveStartPacket(Buffer);
+
+    public void Process()
+    {
+        throw new NotImplementedException();
     }
 }

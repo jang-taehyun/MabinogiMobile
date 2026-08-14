@@ -10,38 +10,29 @@ public class Character : MonoBehaviour
 {
     // transform //
     public float MoveSpeed { get; private set; } = 8.0f;
-    public float RotateSpeed { get; private set; } = 80.0f;
-    private void ControlLocalPlayerTransform()
+    Transform? cameraTransform = null;
+    
+    public void ControlLocalPlayerTransform(InputAction.CallbackContext context)
     {
         bool IsControl = false;
 
-        if (MoveAction != null)
+        Vector3 MoveValue = context.ReadValue<Vector3>();
+
+        // camera의 forward vector 방향으로 character를 회전
+        transform.Rotate(new Vector3(0.0f, cameraTransform!.rotation.y, 0.0f));
+
+        // 이동
+        transform.Translate(MoveValue.normalized * MoveSpeed * Time.deltaTime);
+        CharacterAnimator.SetFloat("MoveSpeed", MoveSpeed);
+        IsControl = true;
+
+        if (context.performed is false)
         {
-            Vector3 MoveValue = MoveAction.ReadValue<Vector3>();
-            if (MoveValue != Vector3.zero)
-            {
-                transform.Translate(MoveValue.normalized * MoveSpeed * Time.deltaTime);
-                CharacterAnimator.SetFloat("MoveSpeed", MoveSpeed);
-                IsControl = true;
-            }
-            else
-            {
-                CharacterAnimator.SetFloat("MoveSpeed", 0.0f);
-            }
+            CharacterAnimator.SetFloat("MoveSpeed", 0.0f);
         }
 
-        if (RotationAction != null)
-        {
-            Vector2 RotateValue = RotationAction.ReadValue<Vector2>();
-            if (Mouse.current.leftButton.IsPressed() && RotateValue != Vector2.zero)
-            {
-                transform.Rotate(new Vector3(0, RotateValue.y, 0) * RotateSpeed * Time.deltaTime, Space.World);
-                IsControl = true;
-            }
-        }
-
-        if (IsControl is true)
-            _ = NetworkManager.Instance.SendPacket(PacketID.Transform, ConvertTransformToByteArray());
+        //if (IsControl is true)
+        //    _ = NetworkManager.Instance.SendPacket(PacketID.Transform, ConvertTransformToByteArray());
     }
     public void MoveRemoteCharacter(TransformPacket packet)
     {
@@ -50,24 +41,21 @@ public class Character : MonoBehaviour
     }
 
     // attack //
-    private void AttackOther()
+    public void AttackOther(InputAction.CallbackContext context)
     {
-        if (AttackAction != null && AttackAction.WasReleasedThisFrame() is true)
-        {
-            CharacterAnimator.SetTrigger("AttackTrigger");
+        CharacterAnimator.SetTrigger("AttackTrigger");
 
-            // ------------------
-            // todo : test code
-            byte[] data = new byte[sizeof(int) + sizeof(int)];
-            int offset = 0;
-            BitConverter.TryWriteBytes(data.AsSpan<byte>(offset, sizeof(int)), PlayerID);
-            offset += sizeof(int);
-            BitConverter.TryWriteBytes(data.AsSpan<byte>(offset, sizeof(int)), 0);
-            offset += sizeof(int);
-            // ------------------
+        // ------------------
+        // todo : test code
+        byte[] data = new byte[sizeof(int) + sizeof(int)];
+        int offset = 0;
+        BitConverter.TryWriteBytes(data.AsSpan<byte>(offset, sizeof(int)), PlayerID);
+        offset += sizeof(int);
+        BitConverter.TryWriteBytes(data.AsSpan<byte>(offset, sizeof(int)), 0);
+        offset += sizeof(int);
+        // ------------------
 
-            _ = NetworkManager.Instance.SendPacket(PacketID.Attack, data);
-        }
+        _ = NetworkManager.Instance.SendPacket(PacketID.Attack, data);
     }
     public void OutputAttackAnimation()
     {
@@ -78,9 +66,6 @@ public class Character : MonoBehaviour
     Animator CharacterAnimator = null!;
 
     // input //
-    InputAction? MoveAction = null;
-    InputAction? RotationAction = null;
-    InputAction? AttackAction = null;
     private void SetInputAction()
     {
         PlayerInput inputComponent = GetComponent<PlayerInput>();
@@ -88,18 +73,6 @@ public class Character : MonoBehaviour
             throw new MobinogiException("player input component를 찾지 못함");
 
         inputComponent.enabled = true;
-
-        MoveAction = inputComponent.actions.FindAction("CharacterControl/Move");
-        if (MoveAction == null)
-            throw new MobinogiException("move action not find");
-
-        RotationAction = inputComponent.actions.FindAction("CharacterControl/Rotation");
-        if (RotationAction == null)
-            throw new MobinogiException("rotation action not find");
-
-        AttackAction = inputComponent.actions.FindAction("CharacterControl/Attack");
-        if (AttackAction == null)
-            throw new MobinogiException("attack action not find");
     }
 
     // unity event method //
@@ -120,11 +93,11 @@ public class Character : MonoBehaviour
     [Obsolete("test code", false)]
     void Update()
     {
-        if (IsLocal is true)
-        {
-            ControlLocalPlayerTransform();
-            AttackOther();
-        }
+        //if (IsLocal is true)
+        //{
+        //    ControlLocalPlayerTransform();
+        //    AttackOther();
+        //}
     }
 
     // local player //
@@ -145,6 +118,7 @@ public class Character : MonoBehaviour
             return;
         }
         cameraComponent.enabled = true;
+        cameraTransform = cameraComponent.transform;
 
         UniversalAdditionalCameraData cameraData = GetComponentInChildren<UniversalAdditionalCameraData>();
         if (cameraData == null)
@@ -153,6 +127,14 @@ public class Character : MonoBehaviour
             return;
         }
         cameraData.enabled = true;
+
+        CameraControl cameraControl = GetComponentInChildren<CameraControl>();
+        if (cameraControl == null)
+        {
+            Debug.Log("can not find camera control component in character");
+            return;
+        }
+        cameraControl.enabled = true;
     }
 
     private void SetAudioListener()

@@ -117,7 +117,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInput
   m_Actions: {fileID: -944628639613478452, guid: 7ed714b5fb41aba44a9403411bcc457b, type: 3}
-  m_NotificationBehavior: 0
+  m_NotificationBehavior: 2
   m_UIInputModule: {fileID: 0}
   m_DeviceLostEvent:
     m_PersistentCalls:
@@ -128,9 +128,73 @@ MonoBehaviour:
   m_ControlsChangedEvent:
     m_PersistentCalls:
       m_Calls: []
-  m_ActionEvents: []
+  m_ActionEvents:
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1724452833137445655}
+        m_TargetAssemblyTypeName: Character, Assembly-CSharp
+        m_MethodName: ControlLocalPlayerTransform
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: 6cc0e548-e4e1-4f94-a738-68860ed784fb
+    m_ActionName: 'CharacterControl/Move[/Keyboard/a,/Keyboard/d,/Keyboard/w,/Keyboard/s]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1724452833137445655}
+        m_TargetAssemblyTypeName: Character, Assembly-CSharp
+        m_MethodName: AttackOther
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: f87db411-5ed0-4cbe-9986-9a9fe5fbf73b
+    m_ActionName: 'CharacterControl/Attack[/Keyboard/space]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 5764550584627262521}
+        m_TargetAssemblyTypeName: CameraControl, Assembly-CSharp
+        m_MethodName: SetCameraRotatingState
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: 85973f8f-efd1-4f87-a0dd-76e13e3a02b6
+    m_ActionName: 'CharacterControl/Rotation[/Mouse/delta]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 5764550584627262521}
+        m_TargetAssemblyTypeName: CameraControl, Assembly-CSharp
+        m_MethodName: RotateCamera
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: e01d06d9-d646-4ca8-88ab-a5f242a57c54
+    m_ActionName: 'CharacterControl/MouseDelta[/Mouse/delta]'
   m_NeverAutoSwitchControlSchemes: 0
-  m_DefaultControlScheme: 
+  m_DefaultControlScheme: PC
   m_DefaultActionMap: CharacterControl
   m_SplitScreenIndex: -1
   m_Camera: {fileID: 0}
@@ -173,6 +237,7 @@ GameObject:
   - component: {fileID: 480270482967597438}
   - component: {fileID: 5165350470876888102}
   - component: {fileID: 136862913276126523}
+  - component: {fileID: 5764550584627262521}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -298,6 +363,18 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &5764550584627262521
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8238565691110834286}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3088e624eb19f3342832c93b27f496ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraControl
 --- !u!1001 &500106690205377329
 PrefabInstance:
   m_ObjectHideFlags: 0

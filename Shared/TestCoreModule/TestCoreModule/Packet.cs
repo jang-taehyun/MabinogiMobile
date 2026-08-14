@@ -19,7 +19,6 @@ namespace CoreModule
         Transform,
         Attack,
         CloseClient,
-        PlayerMoveStart,
 
         Max
     }
@@ -300,65 +299,5 @@ namespace CoreModule
 
         public void DeserializeData(byte[] data) => DisconnectedPlayerID = BitConverter.ToInt32(data, 0);
         public byte[] SerializeData() => BitConverter.GetBytes(DisconnectedPlayerID);
-    }
-
-    public class PlayerMoveStartPacket : IPacket
-    {
-        public int DataSize
-        {
-            get => sizeof(int) + sizeof(float) * 3;
-        }
-        public int MovePlayerID { get; set; } = 0;
-        public float[] ForwardVector { get; set; } = null!;
-
-        public PlayerMoveStartPacket(int movePlayerID, float[] forwardVector)
-        {
-            MovePlayerID = movePlayerID;
-            ForwardVector = forwardVector;
-        }
-
-        public PlayerMoveStartPacket(byte[] data) => DeserializeData(data);
-
-        public void DeserializeData(byte[] data)
-        {
-            if (MovePlayerID is 0)
-            {
-                ForwardVector = new float[3];
-                int position = 0;
-
-                // deserialize move player id
-                ReadOnlySpan<byte> movePlayerIDViewer = data.AsSpan<byte>(position, sizeof(int));
-                MovePlayerID = MemoryMarshal.Read<int>(movePlayerIDViewer);
-                position += sizeof(int);
-
-                // deserialize forward vector
-                for (int i = 0; i < ForwardVector.Length; ++i)
-                {
-                    ReadOnlySpan<byte> forwardVectorViewer = data.AsSpan<byte>(position, sizeof(float));
-                    ForwardVector[i] = MemoryMarshal.Read<float>(forwardVectorViewer);
-                    position += sizeof(float);
-                }
-            }
-        }
-
-        public byte[] SerializeData()
-        {
-            byte[] result = new byte[DataSize];
-            int position = 0;
-            Span<byte> data = new Span<byte>(result);
-
-            // serialize Player ID
-            BitConverter.TryWriteBytes(data.Slice(position, sizeof(int)), MovePlayerID);
-            position += sizeof(int);
-
-            // serialize transform
-            for (int i = 0; i < ForwardVector.Length; ++i)
-            {
-                BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), ForwardVector[i]);
-                position += sizeof(float);
-            }
-
-            return result;
-        }
     }
 }

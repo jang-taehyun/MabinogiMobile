@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MabinogiMobileServer", "Mab
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreModule", "..\..\Shared\CoreModule\CoreModule.csproj", "{3B2C4A3D-E3D7-E9C6-542F-A8B732846562}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestCoreModule", "..\..\Shared\TestCoreModule\TestCoreModule\TestCoreModule.csproj", "{27F48115-7AB9-4208-BF44-EB44956FADA6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{3B2C4A3D-E3D7-E9C6-542F-A8B732846562}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3B2C4A3D-E3D7-E9C6-542F-A8B732846562}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3B2C4A3D-E3D7-E9C6-542F-A8B732846562}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27F48115-7AB9-4208-BF44-EB44956FADA6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27F48115-7AB9-4208-BF44-EB44956FADA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27F48115-7AB9-4208-BF44-EB44956FADA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27F48115-7AB9-4208-BF44-EB44956FADA6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
