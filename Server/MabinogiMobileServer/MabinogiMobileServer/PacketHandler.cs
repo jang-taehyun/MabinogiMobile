@@ -21,6 +21,7 @@ namespace MabinogiMobileServer
             { PacketID.Transform,           (byte[] data) => new TransformPacketHandler(data)                  },
             { PacketID.Attack,              (byte[] data) => new AttackPacketHandler(data)                     },
             { PacketID.CloseClient,         (byte[] data) => new CloseClientPacketHandler(data)                },
+            { PacketID.PlayerMoving,        (byte[] data) => new PlayerMovingPacketHandler(data)                },
         };
         public static IReadOnlyDictionary<PacketID, Func<byte[], IPacketHandler>> Generator => generator;
     }
@@ -65,8 +66,21 @@ namespace MabinogiMobileServer
     {
         public IPacket Packet { get; }
 
-        public CloseClientPacketHandler(byte[] Buffer) => Packet = new AttackPacket(Buffer);
+        public CloseClientPacketHandler(byte[] Buffer) => Packet = new CloseClientPacket(Buffer);
 
         public void Process() {}
+    }
+
+    public class PlayerMovingPacketHandler : IPacketHandler
+    {
+        public IPacket Packet { get; }
+
+        public PlayerMovingPacketHandler(byte[] Buffer) => Packet = new PlayerMovingPacket(Buffer);
+
+        public void Process()
+        {
+            PlayerMovingPacket packet = (PlayerMovingPacket)Packet;
+            NetworkManager.Instance.Broadcast(PacketID.PlayerMoving, packet, packet.MovePlayerID);
+        }
     }
 }

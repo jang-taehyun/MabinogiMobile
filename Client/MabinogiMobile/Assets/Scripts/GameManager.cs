@@ -2,7 +2,6 @@
 
 using CoreModule;
 using System.Collections.Generic;
-using Unity.AppUI.Core;
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
@@ -54,14 +53,8 @@ public class GameManager : MonoBehaviour
     private Spawner CharacterSpawner = null!;
     public void SpawnRemotePlayer(int RemotePlayerID, Vector3 position, Quaternion rotation)
     {
-        Players.Add(RemotePlayerID, CharacterSpawner.SpawnCharacter(RemotePlayerID, position, rotation));
+        Players.Add(RemotePlayerID, CharacterSpawner.SpawnRemoteCharacter(RemotePlayerID, position, rotation));
         Debug.Log($"[my ID {LocalPlayerID}] : create remote player {RemotePlayerID}");
-    }
-    public void SpanwLocalPlayer()
-    {
-        // spawn local player
-        Players.Add(LocalPlayerID, CharacterSpawner.SpawnCharacter(LocalPlayerID, Vector3.zero, Quaternion.identity, true));
-        Debug.Log($"[my ID {LocalPlayerID}] : create local");
     }
 
     // manage job //

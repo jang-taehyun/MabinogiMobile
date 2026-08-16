@@ -136,7 +136,7 @@ namespace TestCoreModule
 
         public static string CheckPacketSerialize(Data data)
         {
-            PlayerMoveStartPacket packet = new PlayerMoveStartPacket(data.PlayerID, data.Forward);
+            PlayerMovingPacket packet = new PlayerMovingPacket(data.PlayerID, data.Forward);
             byte[] origin = data.SerializeResult;
             byte[] compare = packet.SerializeData();
 
@@ -154,7 +154,7 @@ namespace TestCoreModule
 
         public static string CheckPacketDeserialize(Data data)
         {
-            PlayerMoveStartPacket compare = new PlayerMoveStartPacket(data.SerializeResult);
+            PlayerMovingPacket compare = new PlayerMovingPacket(data.SerializeResult);
 
             // check player id
             if (data.PlayerID != compare.MovePlayerID)

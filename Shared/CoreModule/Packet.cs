@@ -19,7 +19,7 @@ namespace CoreModule
         Transform,
         Attack,
         CloseClient,
-        PlayerMoveStart,
+        PlayerMoving,
 
         Max
     }
@@ -302,7 +302,7 @@ namespace CoreModule
         public byte[] SerializeData() => BitConverter.GetBytes(DisconnectedPlayerID);
     }
 
-    public class PlayerMoveStartPacket : IPacket
+    public class PlayerMovingPacket : IPacket
     {
         public int DataSize
         {
@@ -311,13 +311,13 @@ namespace CoreModule
         public int MovePlayerID { get; set; } = 0;
         public float[] ForwardVector { get; set; } = null!;
 
-        public PlayerMoveStartPacket(int movePlayerID, float[] forwardVector)
+        public PlayerMovingPacket(int movePlayerID, float[] forwardVector)
         {
             MovePlayerID = movePlayerID;
             ForwardVector = forwardVector;
         }
 
-        public PlayerMoveStartPacket(byte[] data) => DeserializeData(data);
+        public PlayerMovingPacket(byte[] data) => DeserializeData(data);
 
         public void DeserializeData(byte[] data)
         {

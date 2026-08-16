@@ -24,7 +24,7 @@ public class PacketHandler
         { PacketID.Transform,           (byte[] data) => new TransformPacketHandler(data)          },
         { PacketID.Attack,              (byte[] data) => new AttackPacketHandler(data)             },
         { PacketID.CloseClient,         (byte[] data) => new CloseClientPacketHandler(data)        },
-        { PacketID.PlayerMoveStart,     (byte[] data) => new PlayerMoveStartPacketHandler(data)    },
+        { PacketID.PlayerMoving,        (byte[] data) => new PlayerMovingPacketHandler(data)    },
     };
     public static IReadOnlyDictionary<PacketID, Func<byte[], IPacketHandler>> Generator => generator;
 }
@@ -39,31 +39,31 @@ public class InitialWorldStatePacketHandler : IPacketHandler
     {
         InitialWorldStatePacket packet = (InitialWorldStatePacket)Packet;
 
-        // get allocated playe ID & spawn local character
+        // get allocated playe ID
         GameManager.Instance.LocalPlayerID = packet.AllocatedPlayerID;
-        GameManager.Instance.SpanwLocalPlayer();
 
         // spawn remote player
         if (packet.WorldStateData is not null)
         {
-            int offset = Character.SerializeLength;
-            int pos = 0;
+            int offset = SerializeUtility.SerializePlayerInfoLength;
+            int position = 0;
             int playerId = 0;
-            float[] transform = new float[(int)TransformElement.element];
-            while (pos < packet.WorldStateData.Length)
+            float[] transform = new float[SerializeUtility.TransformLength];
+
+            while (position < packet.WorldStateData.Length)
             {
-                Span<byte> remotePlayerData = new Span<byte>(packet.WorldStateData, pos, offset);
-                int innerPos = 0;
+                Span<byte> remotePlayerData = new Span<byte>(packet.WorldStateData, position, offset);
+                int innerPosition = 0;
 
                 // read remote player ID
-                playerId = MemoryMarshal.Read<int>(remotePlayerData.Slice(innerPos, sizeof(int)));
-                innerPos += sizeof(int);
+                playerId = MemoryMarshal.Read<int>(remotePlayerData.Slice(innerPosition, sizeof(int)));
+                innerPosition += sizeof(int);
 
                 // read remote player's character transform
                 for (int i = 0; i < transform.Length; ++i)
                 {
-                    transform[i] = MemoryMarshal.Read<float>(remotePlayerData.Slice(innerPos, sizeof(float)));
-                    innerPos += sizeof(float);
+                    transform[i] = MemoryMarshal.Read<float>(remotePlayerData.Slice(innerPosition, sizeof(float)));
+                    innerPosition += sizeof(float);
                 }
 
                 // spawn remote player's character
@@ -74,7 +74,7 @@ public class InitialWorldStatePacketHandler : IPacketHandler
                 );
 
                 // increate pos
-                pos += offset;
+                position += offset;
             }
         }
     }
@@ -100,9 +100,9 @@ public class TransformPacketHandler : IPacketHandler
         else
         {
             // move remote character
-            Character remoteCharacter = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
+            RemoteCharacter remoteCharacter = GameManager.Instance.Players[packet.PlayerID].GetComponent<RemoteCharacter>();
             if (remoteCharacter is not null)
-                remoteCharacter.MoveRemoteCharacter(packet);
+                remoteCharacter.EndMove(packet);
         }
     }
 }
@@ -118,7 +118,7 @@ public class AttackPacketHandler : IPacketHandler
         AttackPacket packet = (AttackPacket)Packet;
 
         // output attack animation to remote player
-        Character RemoteCharacter = GameManager.Instance.Players[packet.AttackPlayerID].GetComponent<Character>();
+        RemoteCharacter RemoteCharacter = GameManager.Instance.Players[packet.AttackPlayerID].GetComponent<RemoteCharacter>();
         if (RemoteCharacter is not null)
             RemoteCharacter.OutputAttackAnimation();
     }
@@ -136,14 +136,19 @@ public class CloseClientPacketHandler : IPacketHandler
     }
 }
 
-public class PlayerMoveStartPacketHandler : IPacketHandler
+public class PlayerMovingPacketHandler : IPacketHandler
 {
     public IPacket Packet { get; }
 
-    public PlayerMoveStartPacketHandler(byte[] Buffer) => Packet = new PlayerMoveStartPacket(Buffer);
+    public PlayerMovingPacketHandler(byte[] Buffer) => Packet = new PlayerMovingPacket(Buffer);
 
     public void Process()
     {
-        throw new NotImplementedException();
+        PlayerMovingPacket packet = (PlayerMovingPacket)Packet;
+
+        Vector3 forward = new Vector3(packet.ForwardVector[0], packet.ForwardVector[1], packet.ForwardVector[2]);
+        RemoteCharacter RemoteCharacter = GameManager.Instance.Players[packet.MovePlayerID].GetComponent<RemoteCharacter>();
+        if (RemoteCharacter is not null)
+            RemoteCharacter.MoveRemoteCharacter(forward);
     }
 }

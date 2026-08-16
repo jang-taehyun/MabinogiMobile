@@ -25,22 +25,13 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Rotation",
+                    "name": "Rotate",
                     "type": "Button",
-                    "id": "85973f8f-efd1-4f87-a0dd-76e13e3a02b6",
+                    "id": "ea572f8e-c969-437c-af27-694948ee16cc",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "MouseDelta",
-                    "type": "Value",
-                    "id": "e01d06d9-d646-4ca8-88ab-a5f242a57c54",
-                    "expectedControlType": "Vector2",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -112,23 +103,12 @@
                 },
                 {
                     "name": "",
-                    "id": "826d209a-29db-49ad-9fa0-3f9a4cfb1e74",
+                    "id": "9a69c1fc-de70-4d78-a7b3-f28010f705f9",
                     "path": "<Mouse>/rightButton",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Rotation",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "8b545efc-46b9-42d1-ba30-d956c014bae7",
-                    "path": "<Mouse>/delta",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "MouseDelta",
+                    "action": "Rotate",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
