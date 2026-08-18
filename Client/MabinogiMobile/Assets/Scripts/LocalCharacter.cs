@@ -14,27 +14,24 @@ public class LocalCharacter : Character
         if (context.started)
         {
             CharacterAnimator.SetBool("IsMoving", true);
-
-            Vector3 rotation = RotateLocalCharacter();
-            if (Mathf.Abs(rotation.sqrMagnitude) > 0.0001f)
-            {
-                transform.Rotate(rotation);
-            }
+            RotateLocalCharacter();
 
             // send position, forward vector
-            _ = NetworkManager.Instance.SendPacket(PacketID.Transform, SerializeUtility.SerializePlayerInfo(transform.position, transform.forward, GameManager.Instance.LocalPlayerID));
+            _ = NetworkManager.Instance.SendPacket(PacketID.PlayerMoving, SerializeUtility.SerializePlayerInfo(transform.position, transform.forward, GameManager.Instance.LocalPlayerID));
         }
         else if (context.canceled)
         {
             CharacterAnimator.SetBool("IsMoving", false);
 
             // send character's final position & rotation
-            _ = NetworkManager.Instance.SendPacket(PacketID.Transform, SerializeUtility.SerializePlayerInfo(transform.position, transform.forward, GameManager.Instance.LocalPlayerID));
+            _ = NetworkManager.Instance.SendPacket(PacketID.PlayerMoveEnd, SerializeUtility.SerializePlayerInfo(transform.position, transform.forward, GameManager.Instance.LocalPlayerID));
         }
     }
-    private Vector3 RotateLocalCharacter()
+    private void RotateLocalCharacter()
     {
         Vector3 moveValue = MoveAction.ReadValue<Vector3>();
+        if (moveValue == Vector3.zero)
+            return;
 
         // 카메라의 forward를 XZ 평면에 투영
         Vector3 projectedCameraForward = Vector3.ProjectOnPlane(Camera.main.transform.forward, Vector3.up).normalized;
@@ -49,7 +46,13 @@ public class LocalCharacter : Character
 
         // 해당 각도만큼, y축 회전
         Vector3 rotation = new Vector3(0.0f, angle, 0.0f);
-        return rotation;
+        if (Mathf.Abs(rotation.sqrMagnitude) > 0.001f)
+        {
+            transform.Rotate(rotation);
+
+            // send position, forward vector
+            _ = NetworkManager.Instance.SendPacket(PacketID.PlayerMoving, SerializeUtility.SerializePlayerInfo(transform.position, transform.forward, GameManager.Instance.LocalPlayerID));
+        }
     }
 
     // attack //

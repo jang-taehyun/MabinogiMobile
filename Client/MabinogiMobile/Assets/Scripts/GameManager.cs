@@ -20,6 +20,7 @@ public class GameManager : MonoBehaviour
 
     // local player //
     public int LocalPlayerID { get; set; } = 0;
+    public LocalCharacter LocalPlayer = null!;
 
     // manage remote player //
     public Dictionary<int, GameObject> Players { get; private set; } = new Dictionary<int, GameObject>();

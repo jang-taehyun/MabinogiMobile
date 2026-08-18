@@ -136,7 +136,7 @@ namespace TestCoreModule
 
         public static string CheckPacketSerialize(Data data)
         {
-            PlayerMovingPacket packet = new PlayerMovingPacket(data.PlayerID, data.Forward);
+            PlayerMovingPacket packet = new PlayerMovingPacket(data.PlayerID, data.);
             byte[] origin = data.SerializeResult;
             byte[] compare = packet.SerializeData();
 

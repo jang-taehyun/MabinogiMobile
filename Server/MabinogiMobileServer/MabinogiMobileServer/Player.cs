@@ -49,38 +49,39 @@ namespace MabinogiMobileServer
         // move & rotate //
         private static float S_FPT = 0.01667f;
         private static int INT_FPS = 16;
-        private CancellationTokenSource MoveCancelToken = new CancellationTokenSource();
+        public const float MoveSpeed = 8.0f;
+        private CancellationTokenSource? MoveCancelToken = null;
         public void MovePlayer(float[] position, float[] forward)
         {
             // check current position
-            if (Position.Length != position.Length) return;
-            for (int i = 0; i < Position.Length; ++i)
-                if (MathF.Abs(Position[i] - position[i]) > 0.001f) return;
+            //if (Position.Length != position.Length) return;
+            //for (int i = 0; i < Position.Length; ++i)
+            //    if (MathF.Abs(Position[i] - position[i]) > 0.001f) return;
 
             // modify character's forward vector
             Forward = forward;
 
             // move character & run move player at interval
-            MoveCancelToken.Cancel();
-            _ = MovePlayerAtInterval(this, MoveCancelToken.Token);
+            DestroyMoveCancelToken();
+            MoveCancelToken = new CancellationTokenSource();
+            _ = MovePlayerAtInterval(MoveCancelToken.Token);
         }
-        private static async Task MovePlayerAtInterval(Player movePlayer, CancellationToken token)
+        private async Task MovePlayerAtInterval(CancellationToken token)
         {
             while (token.IsCancellationRequested is false)
             {
                 // compute target position
                 float[] targetPosition = new float[3];
                 for (int i = 0; i < 3; ++i)
-                    targetPosition[i] = movePlayer.Position[i] + movePlayer.Forward[i] * S_FPT;
+                    targetPosition[i] = Position[i] + Forward[i] * S_FPT * MoveSpeed;
 
                 // modify character position
-                movePlayer.Position = targetPosition;
+                Position = targetPosition;
 
                 // broadcast target position, forward
                 NetworkManager.Instance.Broadcast(
                     PacketID.PlayerMoving,
-                    new PlayerMovingPacket(movePlayer.PlayerID, movePlayer.Position, movePlayer.Forward),
-                    movePlayer.PlayerID
+                    new PlayerMovingPacket(PlayerID, Position, Forward)
                 );
 
                 await Task.Delay(INT_FPS, token);
@@ -116,23 +117,28 @@ namespace MabinogiMobileServer
             }
 
             // cancel move player at inteval
-            MoveCancelToken.Cancel();
+            DestroyMoveCancelToken();
 
             // broadcast player end move packet
             NetworkManager.Instance.Broadcast(
                     PacketID.PlayerMoveEnd,
-                    new PlayerMoveEndPacket(PlayerID, Position, Forward),
-                    PlayerID
+                    new PlayerMoveEndPacket(PlayerID, Position, Forward)
             );
+        }
+        public void DestroyMoveCancelToken()
+        {
+            MoveCancelToken?.Cancel();
+            MoveCancelToken?.Dispose();
+            MoveCancelToken = null;
         }
 
         public void Dispose()
         {
             ClientSocket.Shutdown(SocketShutdown.Both);
             ClientSocket.Close();
+            ClientSocket.Dispose();
 
-            MoveCancelToken.Cancel();
-            MoveCancelToken.Dispose();
+            DestroyMoveCancelToken();
         }
     }
 }

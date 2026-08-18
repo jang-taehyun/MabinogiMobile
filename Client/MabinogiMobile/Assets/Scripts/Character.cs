@@ -8,9 +8,9 @@ public class Character : MonoBehaviour
     // move //
     public const float MoveSpeed = 8.0f;
     private const float TargetTick = 0.01667f;
-    protected Vector3 TargetPosition;
+    private Vector3 StartPosition;
+    private Vector3 TargetPosition;
     private float AmountTick = 0.0f;
-    private float PreviousTick = 0.0f;
     public virtual void Move(Vector3 targetPosition, Vector3 forward)
     {
         if (TargetPosition == transform.position)
@@ -26,8 +26,10 @@ public class Character : MonoBehaviour
 
         // 캐릭터 이동 준비
         AmountTick = 0.0f;
-        PreviousTick = Time.deltaTime;
+        StartPosition = transform.position;
         TargetPosition = targetPosition;
+
+        Debug.Log($"target position : {TargetPosition.x}, {TargetPosition.y}, {TargetPosition.z}");
     }
     public void MoveEnd(Vector3 position, Vector3 forward)
     {
@@ -63,18 +65,17 @@ public class Character : MonoBehaviour
     }
     protected virtual void Update()
     {
-        if (CharacterAnimator.GetBool("IsMoving") is true)
+        if (CharacterAnimator.GetBool("IsMoving") is true && StartPosition != TargetPosition)
         {
-            AmountTick += (Time.deltaTime - PreviousTick);
-            PreviousTick = Time.deltaTime;
+            AmountTick += Time.deltaTime;
 
+            Vector3 moveAmount;
             if (TargetTick - AmountTick > 0.001f)
-            {
-                Vector3 moveAmount = Vector3.Lerp(transform.position, TargetPosition, TargetTick - AmountTick);
-                transform.Translate(moveAmount, Space.World);
-            }
+                moveAmount = Vector3.Lerp(StartPosition, TargetPosition, AmountTick);
             else
-                transform.position = TargetPosition;
+                moveAmount = TargetPosition;
+
+            transform.position = moveAmount;
         }
     }
 }

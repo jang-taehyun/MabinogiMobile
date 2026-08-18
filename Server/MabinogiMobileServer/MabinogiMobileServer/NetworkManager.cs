@@ -123,6 +123,7 @@ namespace MabinogiMobileServer
                     Process = (Action)delegate ()
                     {
                         Player disconnectedPlayer = PlayerManager.Instance[disconnectedPlayerId]!;
+                        disconnectedPlayer.DestroyMoveCancelToken();
                         CloseClientSocket(disconnectedPlayer);
                         Console.WriteLine($"client close {disconnectedPlayerId}");
                     }

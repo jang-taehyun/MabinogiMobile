@@ -152,9 +152,14 @@ public class PlayerMovingPacketHandler : IPacketHandler
 
         Vector3 position = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
         Vector3 forward = new Vector3(packet.ForwardVector[0], packet.ForwardVector[1], packet.ForwardVector[2]);
-        Character character = GameManager.Instance.Players[packet.MovePlayerID].GetComponent<Character>();
-        if (character is not null)
-            character.Move(position, forward);
+        if (packet.MovePlayerID != GameManager.Instance.LocalPlayerID)
+        {
+            Character character = GameManager.Instance.Players[packet.MovePlayerID].GetComponent<Character>();
+            if (character is not null)
+                character.Move(position, forward);
+        }
+        else
+            GameManager.Instance.LocalPlayer.Move(position, forward);
     }
 }
 
@@ -170,8 +175,15 @@ public class PlayerMoveEndHandler : IPacketHandler
 
         Vector3 position = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
         Vector3 forward = new Vector3(packet.ForwardVector[0], packet.ForwardVector[1], packet.ForwardVector[2]);
-        Character character = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
-        if (character is not null)
-            character.MoveEnd(position, forward);
+        if (packet.PlayerID != GameManager.Instance.LocalPlayerID)
+        {
+            Character character = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
+            if (character is not null)
+                character.MoveEnd(position, forward);
+        }
+        else
+            GameManager.Instance.LocalPlayer.MoveEnd(position, forward);
+
+        
     }
 }
