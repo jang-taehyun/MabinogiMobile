@@ -20,6 +20,7 @@ namespace CoreModule
         Attack,
         CloseClient,
         PlayerMoving,
+        PlayerMoveEnd,
 
         Max
     }
@@ -83,7 +84,7 @@ namespace CoreModule
             // serialize packet header
             SerializePacketHeader(id, data.Length, packet.AsSpan<byte>(position, PacketHeader.HeaderSize));
             position += PacketHeader.HeaderSize;
-            
+
             // copy data
             Array.Copy(data, 0, packet, position, data.Length);
 
@@ -167,28 +168,22 @@ namespace CoreModule
     {
         public int PlayerID { get; private set; } = 0;
 
-        public float[] Transform { get; private set; } = null!;
-        private int TransformSize { get; } = 7;
-        public float PositionX => Transform[0];
-        public float PositionY => Transform[1];
-        public float PositionZ => Transform[2];
-        public float RotationX => Transform[3];
-        public float RotationY => Transform[4];
-        public float RotationZ => Transform[5];
-        public float RotationW => Transform[6];
+        public float[] Position { get; private set; } = null!;
+        public float[] ForwardVector { get; private set; } = null!;
 
         public int DataSize
         {
             get
             {
-                return sizeof(int) + sizeof(float) * TransformSize;
+                return sizeof(int) + sizeof(float) * 3 + sizeof(float) * 3;
             }
         }
 
-        public TransformPacket(int playerId, float[] transform)
+        public TransformPacket(int playerId, float[] position, float[] forward)
         {
             PlayerID = playerId;
-            Transform = transform;
+            Position = position;
+            ForwardVector = forward;
         }
         public TransformPacket(byte[] buffer) => DeserializeData(buffer);
 
@@ -196,7 +191,6 @@ namespace CoreModule
         {
             if (PlayerID is 0)
             {
-                Transform = new float[TransformSize];
                 int position = 0;
 
                 // deserialize Player ID
@@ -204,11 +198,21 @@ namespace CoreModule
                 PlayerID = MemoryMarshal.Read<int>(playerIDViewer);
                 position += sizeof(int);
 
-                // deserialize Transform
-                for (int i = 0; i < TransformSize; ++i)
+                // deserialize position
+                Position = new float[3];
+                for (int i = 0; i < Position.Length; ++i)
                 {
-                    ReadOnlySpan<byte> transformElementViewer = data.AsSpan<byte>(position, sizeof(float));
-                    Transform[i] = MemoryMarshal.Read<float>(transformElementViewer);
+                    ReadOnlySpan<byte> positionElementViewer = data.AsSpan<byte>(position, sizeof(float));
+                    Position[i] = MemoryMarshal.Read<float>(positionElementViewer);
+                    position += sizeof(float);
+                }
+
+                // deserialize forward
+                ForwardVector = new float[3];
+                for (int i = 0; i < ForwardVector.Length; ++i)
+                {
+                    ReadOnlySpan<byte> forwardElementViewer = data.AsSpan<byte>(position, sizeof(float));
+                    ForwardVector[i] = MemoryMarshal.Read<float>(forwardElementViewer);
                     position += sizeof(float);
                 }
             }
@@ -224,10 +228,17 @@ namespace CoreModule
             BitConverter.TryWriteBytes(data.Slice(position, sizeof(int)), PlayerID);
             position += sizeof(int);
 
-            // serialize transform
-            for (int i = 0; i < Transform.Length; ++i)
+            // serialize position
+            for (int i = 0; i < Position.Length; ++i)
             {
-                BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), Transform[i]);
+                BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), Position[i]);
+                position += sizeof(float);
+            }
+
+            // serialize forward vector
+            for (int i = 0; i < ForwardVector.Length; ++i)
+            {
+                BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), ForwardVector[i]);
                 position += sizeof(float);
             }
 
@@ -306,15 +317,17 @@ namespace CoreModule
     {
         public int DataSize
         {
-            get => sizeof(int) + sizeof(float) * 3;
+            get => sizeof(int) + sizeof(float) * 6;
         }
         public int MovePlayerID { get; set; } = 0;
+        public float[] Position { get; set; } = null!;
         public float[] ForwardVector { get; set; } = null!;
 
-        public PlayerMovingPacket(int movePlayerID, float[] forwardVector)
+        public PlayerMovingPacket(int movePlayerID, float[] position, float[] forwardVector)
         {
             MovePlayerID = movePlayerID;
             ForwardVector = forwardVector;
+            Position = position;
         }
 
         public PlayerMovingPacket(byte[] data) => DeserializeData(data);
@@ -323,6 +336,7 @@ namespace CoreModule
         {
             if (MovePlayerID is 0)
             {
+                Position = new float[3];
                 ForwardVector = new float[3];
                 int position = 0;
 
@@ -330,6 +344,14 @@ namespace CoreModule
                 ReadOnlySpan<byte> movePlayerIDViewer = data.AsSpan<byte>(position, sizeof(int));
                 MovePlayerID = MemoryMarshal.Read<int>(movePlayerIDViewer);
                 position += sizeof(int);
+
+                // deserialize position
+                for (int i = 0; i < Position.Length; ++i)
+                {
+                    ReadOnlySpan<byte> positionViewer = data.AsSpan<byte>(position, sizeof(float));
+                    Position[i] = MemoryMarshal.Read<float>(positionViewer);
+                    position += sizeof(float);
+                }
 
                 // deserialize forward vector
                 for (int i = 0; i < ForwardVector.Length; ++i)
@@ -352,6 +374,95 @@ namespace CoreModule
             position += sizeof(int);
 
             // serialize transform
+            for (int i = 0; i < Position.Length; ++i)
+            {
+                BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), Position[i]);
+                position += sizeof(float);
+            }
+
+            // serialize transform
+            for (int i = 0; i < ForwardVector.Length; ++i)
+            {
+                BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), ForwardVector[i]);
+                position += sizeof(float);
+            }
+
+            return result;
+        }
+    }
+
+    public class PlayerMoveEndPacket : IPacket
+    {
+        public int PlayerID { get; private set; } = 0;
+
+        public float[] Position { get; private set; } = null!;
+        public float[] ForwardVector { get; private set; } = null!;
+
+        public int DataSize
+        {
+            get
+            {
+                return sizeof(int) + sizeof(float) * 3 + sizeof(float) * 3;
+            }
+        }
+
+        public PlayerMoveEndPacket(int playerId, float[] position, float[] forward)
+        {
+            PlayerID = playerId;
+            Position = position;
+            ForwardVector = forward;
+        }
+        public PlayerMoveEndPacket(byte[] buffer) => DeserializeData(buffer);
+
+        public void DeserializeData(byte[] data)
+        {
+            if (PlayerID is 0)
+            {
+                int position = 0;
+
+                // deserialize Player ID
+                ReadOnlySpan<byte> playerIDViewer = data.AsSpan<byte>(position, sizeof(int));
+                PlayerID = MemoryMarshal.Read<int>(playerIDViewer);
+                position += sizeof(int);
+
+                // deserialize position
+                Position = new float[3];
+                for (int i = 0; i < Position.Length; ++i)
+                {
+                    ReadOnlySpan<byte> positionElementViewer = data.AsSpan<byte>(position, sizeof(float));
+                    Position[i] = MemoryMarshal.Read<float>(positionElementViewer);
+                    position += sizeof(float);
+                }
+
+                // deserialize forward
+                ForwardVector = new float[3];
+                for (int i = 0; i < ForwardVector.Length; ++i)
+                {
+                    ReadOnlySpan<byte> forwardElementViewer = data.AsSpan<byte>(position, sizeof(float));
+                    ForwardVector[i] = MemoryMarshal.Read<float>(forwardElementViewer);
+                    position += sizeof(float);
+                }
+            }
+        }
+
+        public byte[] SerializeData()
+        {
+            byte[] result = new byte[DataSize];
+            int position = 0;
+            Span<byte> data = new Span<byte>(result);
+
+            // serialize Player ID
+            BitConverter.TryWriteBytes(data.Slice(position, sizeof(int)), PlayerID);
+            position += sizeof(int);
+
+            // serialize position
+            for (int i = 0; i < Position.Length; ++i)
+            {
+                BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), Position[i]);
+                position += sizeof(float);
+            }
+
+            // serialize forward vector
             for (int i = 0; i < ForwardVector.Length; ++i)
             {
                 BitConverter.TryWriteBytes(data.Slice(position, sizeof(float)), ForwardVector[i]);

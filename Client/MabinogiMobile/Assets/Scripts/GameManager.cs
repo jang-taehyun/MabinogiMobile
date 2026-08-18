@@ -51,10 +51,10 @@ public class GameManager : MonoBehaviour
 
     // spawner //
     private Spawner CharacterSpawner = null!;
-    public void SpawnRemotePlayer(int RemotePlayerID, Vector3 position, Quaternion rotation)
+    public void SpawnRemotePlayer(int remotePlayerID, Vector3 position, Quaternion rotation)
     {
-        Players.Add(RemotePlayerID, CharacterSpawner.SpawnRemoteCharacter(RemotePlayerID, position, rotation));
-        Debug.Log($"[my ID {LocalPlayerID}] : create remote player {RemotePlayerID}");
+        Players.Add(remotePlayerID, CharacterSpawner.SpawnRemoteCharacter(remotePlayerID, position, rotation));
+        Debug.Log($"[my ID {LocalPlayerID}] : create remote player {remotePlayerID}");
     }
 
     // manage job //

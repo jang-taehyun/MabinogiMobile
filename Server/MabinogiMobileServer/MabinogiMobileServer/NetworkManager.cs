@@ -60,7 +60,7 @@ namespace MabinogiMobileServer
                         _ = NetworkManager.Instance.SendPacket(PacketID.InitialWorldState, initWorldStatePacket, player.ClientSocket);
 
                         // broadcast packet that new client connected
-                        TransformPacket newPlayerInfoPacket = new TransformPacket(player.PlayerID, player.Transform);
+                        TransformPacket newPlayerInfoPacket = new TransformPacket(player.PlayerID, player.Position, player.Forward);
                         NetworkManager.Instance.Broadcast(PacketID.Transform, newPlayerInfoPacket, player.PlayerID);
 
                         // create read loop

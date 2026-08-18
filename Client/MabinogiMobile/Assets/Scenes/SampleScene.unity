@@ -324,7 +324,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27cb748777f1a7c4db44192633b480f4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Spawner
-  CharacterPrefab: {fileID: 3566900193191065920, guid: b6465efac4a3dd148aba41dfeca475ff, type: 3}
+  RemoteCharacterPrefab: {fileID: 3566900193191065920, guid: b6465efac4a3dd148aba41dfeca475ff, type: 3}
 --- !u!4 &887945375
 Transform:
   m_ObjectHideFlags: 0
@@ -645,7 +645,7 @@ Transform:
   m_GameObject: {fileID: 1942954371}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.9283, y: 0.85, z: -20.5225}
+  m_LocalPosition: {x: 2.928, y: 0.85, z: -20.5225}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1095,7 +1095,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 5925553611581945278}
         m_TargetAssemblyTypeName: LocalCharacter, Assembly-CSharp
-        m_MethodName: ControlLocalPlayerTransform
+        m_MethodName: MoveLocalPlayer
         m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1360,7 +1360,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1b673e4238a26e48b52ab11c6e3ec88, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalCharacter
-  PlayerID: 0
 --- !u!4 &6311278901522039440
 Transform:
   m_ObjectHideFlags: 0

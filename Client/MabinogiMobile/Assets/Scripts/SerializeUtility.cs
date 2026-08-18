@@ -28,14 +28,14 @@ public class SerializeUtility
         return result;
     }
 
-    public const int TransformLength = 7;
+    public const int TransformLength = 6;
     public const int SerializePlayerInfoLength = sizeof(int) + sizeof(float) * TransformLength;
-    public static byte[] SerializePlayerInfo(Vector3 position, Quaternion rotation, int playerId)
+    public static byte[] SerializePlayerInfo(Vector3 position, Vector3 forward, int playerId)
     {
-        float[] transformData = new float[7]
+        float[] transformData = new float[TransformLength]
         {
             position.x, position.y, position.z,
-            rotation.x, rotation.y, rotation.z, rotation.w
+            forward.x, forward.y, forward.z
         };
 
         byte[] result = new byte[SerializePlayerInfoLength];

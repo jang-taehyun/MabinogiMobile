@@ -21,7 +21,8 @@ namespace MabinogiMobileServer
             { PacketID.Transform,           (byte[] data) => new TransformPacketHandler(data)                  },
             { PacketID.Attack,              (byte[] data) => new AttackPacketHandler(data)                     },
             { PacketID.CloseClient,         (byte[] data) => new CloseClientPacketHandler(data)                },
-            { PacketID.PlayerMoving,        (byte[] data) => new PlayerMovingPacketHandler(data)                },
+            { PacketID.PlayerMoving,        (byte[] data) => new PlayerMovingPacketHandler(data)               },
+            { PacketID.PlayerMoveEnd,       (byte[] data) => new PlayerMoveEndPacketHandler(data)              },
         };
         public static IReadOnlyDictionary<PacketID, Func<byte[], IPacketHandler>> Generator => generator;
     }
@@ -44,7 +45,7 @@ namespace MabinogiMobileServer
         public void Process()
         {
             TransformPacket packet = (TransformPacket)Packet;
-            PlayerManager.Instance.ModifyPlayerTransform(packet.PlayerID, packet.Transform);
+            PlayerManager.Instance.ModifyPlayerTransform(packet.PlayerID, packet.Position, packet.ForwardVector);
             NetworkManager.Instance.Broadcast(PacketID.Transform, packet, packet.PlayerID);
         }
     }
@@ -80,7 +81,24 @@ namespace MabinogiMobileServer
         public void Process()
         {
             PlayerMovingPacket packet = (PlayerMovingPacket)Packet;
-            NetworkManager.Instance.Broadcast(PacketID.PlayerMoving, packet, packet.MovePlayerID);
+
+            // process character move
+            PlayerManager.Instance[packet.MovePlayerID]?.MovePlayer(packet.Position, packet.ForwardVector);
+        }
+    }
+
+    public class PlayerMoveEndPacketHandler : IPacketHandler
+    {
+        public IPacket Packet { get; }
+
+        public PlayerMoveEndPacketHandler(byte[] Buffer) => Packet = new PlayerMoveEndPacket(Buffer);
+
+        public void Process()
+        {
+            PlayerMoveEndPacket packet = (PlayerMoveEndPacket)Packet;
+
+            // process player move end
+            PlayerManager.Instance[packet.PlayerID]?.EndMovePlayer(packet.Position, packet.ForwardVector);
         }
     }
 }

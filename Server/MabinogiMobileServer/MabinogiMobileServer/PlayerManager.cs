@@ -19,6 +19,7 @@ namespace MabinogiMobileServer
             }
         }
 
+        // managed connected client //
         private Dictionary<int, Player> connectedClient = new Dictionary<int, Player>();
         private object connectedClientListLock = new object();
 
@@ -46,7 +47,7 @@ namespace MabinogiMobileServer
             yield break;
         }
 
-        // manage player //
+        // manage connected player //
         public void AddPlayer(Player player)
         {
             lock (connectedClientListLock)
@@ -63,12 +64,12 @@ namespace MabinogiMobileServer
             }
         }
 
-        [Obsolete("test code", false)]
-        public void ModifyPlayerTransform(int playerId, float[] transform)
+        public void ModifyPlayerTransform(int playerId, float[] position, float[] forward)
         {
             lock (connectedClientListLock)
             {
-                connectedClient[playerId].Transform = transform;
+                connectedClient[playerId].Position = position;
+                connectedClient[playerId].Forward = forward;
             }
         }
 

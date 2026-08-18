@@ -9,28 +9,30 @@ public class LocalCharacter : Character
     InputAction MoveAction = null!;
 
     // move & rotate //
-    private bool IsMoving = false;
-
-    public void ControlLocalPlayerTransform(InputAction.CallbackContext context)
+    public void MoveLocalPlayer(InputAction.CallbackContext context)
     {
-        if (context.performed)
+        if (context.started)
         {
-            IsMoving = true;
-            CharacterAnimator.SetFloat("MoveSpeed", MoveSpeed);
+            CharacterAnimator.SetBool("IsMoving", true);
 
-            RotateLocalCharacter();
+            Vector3 rotation = RotateLocalCharacter();
+            if (Mathf.Abs(rotation.sqrMagnitude) > 0.0001f)
+            {
+                transform.Rotate(rotation);
+            }
+
+            // send position, forward vector
+            _ = NetworkManager.Instance.SendPacket(PacketID.Transform, SerializeUtility.SerializePlayerInfo(transform.position, transform.forward, GameManager.Instance.LocalPlayerID));
         }
         else if (context.canceled)
         {
-            IsMoving = false;
-            CharacterAnimator.SetFloat("MoveSpeed", 0.0f);
+            CharacterAnimator.SetBool("IsMoving", false);
 
             // send character's final position & rotation
-            _ = NetworkManager.Instance.SendPacket(PacketID.Transform, SerializeUtility.SerializePlayerInfo(transform.position, transform.rotation, GameManager.Instance.LocalPlayerID));
+            _ = NetworkManager.Instance.SendPacket(PacketID.Transform, SerializeUtility.SerializePlayerInfo(transform.position, transform.forward, GameManager.Instance.LocalPlayerID));
         }
-
     }
-    private void RotateLocalCharacter()
+    private Vector3 RotateLocalCharacter()
     {
         Vector3 moveValue = MoveAction.ReadValue<Vector3>();
 
@@ -47,13 +49,7 @@ public class LocalCharacter : Character
 
         // 해당 각도만큼, y축 회전
         Vector3 rotation = new Vector3(0.0f, angle, 0.0f);
-        if (Mathf.Abs(rotation.sqrMagnitude) > 0.0001f)
-        {
-            transform.Rotate(rotation);
-
-            // send forward vector
-            _ = NetworkManager.Instance.SendPacket(PacketID.PlayerMoving, SerializeUtility.SerializeForwardVector(transform.forward, GameManager.Instance.LocalPlayerID));
-        }
+        return rotation;
     }
 
     // attack //
@@ -89,16 +85,13 @@ public class LocalCharacter : Character
         if (MoveAction is null)
             Debug.Log("move action을 찾지 못함");
     }
-
-    [Obsolete("test code", false)]
-    void Update()
+    protected override void Update()
     {
-        if (IsMoving)
+        base.Update();
+
+        if (CharacterAnimator.GetBool("IsMoving") is true)
         {
             RotateLocalCharacter();
-
-            // 이동 //
-            transform.Translate(transform.forward * MoveSpeed * Time.deltaTime, Space.World);
         }
     }
 }

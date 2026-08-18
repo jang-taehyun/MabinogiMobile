@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
-using static Character;
 
 // client packet handler //
 /**
@@ -24,7 +23,8 @@ public class PacketHandler
         { PacketID.Transform,           (byte[] data) => new TransformPacketHandler(data)          },
         { PacketID.Attack,              (byte[] data) => new AttackPacketHandler(data)             },
         { PacketID.CloseClient,         (byte[] data) => new CloseClientPacketHandler(data)        },
-        { PacketID.PlayerMoving,        (byte[] data) => new PlayerMovingPacketHandler(data)    },
+        { PacketID.PlayerMoving,        (byte[] data) => new PlayerMovingPacketHandler(data)       },
+        { PacketID.PlayerMoveEnd,       (byte[] data) => new PlayerMoveEndHandler(data)            },
     };
     public static IReadOnlyDictionary<PacketID, Func<byte[], IPacketHandler>> Generator => generator;
 }
@@ -39,13 +39,13 @@ public class InitialWorldStatePacketHandler : IPacketHandler
     {
         InitialWorldStatePacket packet = (InitialWorldStatePacket)Packet;
 
-        // get allocated playe ID
+        // spawn local player
         GameManager.Instance.LocalPlayerID = packet.AllocatedPlayerID;
 
         // spawn remote player
         if (packet.WorldStateData is not null)
         {
-            int offset = SerializeUtility.SerializePlayerInfoLength;
+            const int offset = SerializeUtility.SerializePlayerInfoLength;
             int position = 0;
             int playerId = 0;
             float[] transform = new float[SerializeUtility.TransformLength];
@@ -73,7 +73,7 @@ public class InitialWorldStatePacketHandler : IPacketHandler
                     new Quaternion(transform[3], transform[4], transform[5], transform[6])
                 );
 
-                // increate pos
+                // increase pos
                 position += offset;
             }
         }
@@ -93,16 +93,20 @@ public class TransformPacketHandler : IPacketHandler
         // if remote player is not exist in scene, create new remote player
         if (GameManager.Instance.Players.ContainsKey(packet.PlayerID) is false)
         {
-            Vector3 pos = new Vector3(packet.PositionX, packet.PositionY, packet.PositionZ);
-            Quaternion rot = new Quaternion(packet.RotationX, packet.RotationY, packet.RotationZ, packet.RotationW);
-            GameManager.Instance.SpawnRemotePlayer(packet.PlayerID, pos, rot);
+            Vector3 position = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
+            Vector3 forward = new Vector3(packet.ForwardVector[0], packet.ForwardVector[1], packet.ForwardVector[2]);
+            Quaternion rotation = Quaternion.LookRotation(forward);
+            GameManager.Instance.SpawnRemotePlayer(packet.PlayerID, position, rotation);
         }
         else
         {
-            // move remote character
-            RemoteCharacter remoteCharacter = GameManager.Instance.Players[packet.PlayerID].GetComponent<RemoteCharacter>();
-            if (remoteCharacter is not null)
-                remoteCharacter.EndMove(packet);
+            // modify character position, forward
+            Character character = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
+            if (character is not null)
+                character.ModifyCharacterPositionForwardVector(
+                        new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]),
+                        new Vector3(packet.ForwardVector[0], packet.ForwardVector[1], packet.ForwardVector[2])
+                );
         }
     }
 }
@@ -146,9 +150,28 @@ public class PlayerMovingPacketHandler : IPacketHandler
     {
         PlayerMovingPacket packet = (PlayerMovingPacket)Packet;
 
+        Vector3 position = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
         Vector3 forward = new Vector3(packet.ForwardVector[0], packet.ForwardVector[1], packet.ForwardVector[2]);
-        RemoteCharacter RemoteCharacter = GameManager.Instance.Players[packet.MovePlayerID].GetComponent<RemoteCharacter>();
-        if (RemoteCharacter is not null)
-            RemoteCharacter.MoveRemoteCharacter(forward);
+        Character character = GameManager.Instance.Players[packet.MovePlayerID].GetComponent<Character>();
+        if (character is not null)
+            character.Move(position, forward);
+    }
+}
+
+public class PlayerMoveEndHandler : IPacketHandler
+{
+    public IPacket Packet { get; }
+
+    public PlayerMoveEndHandler(byte[] Buffer) => Packet = new PlayerMoveEndPacket(Buffer);
+
+    public void Process()
+    {
+        PlayerMoveEndPacket packet = (PlayerMoveEndPacket)Packet;
+
+        Vector3 position = new Vector3(packet.Position[0], packet.Position[1], packet.Position[2]);
+        Vector3 forward = new Vector3(packet.ForwardVector[0], packet.ForwardVector[1], packet.ForwardVector[2]);
+        Character character = GameManager.Instance.Players[packet.PlayerID].GetComponent<Character>();
+        if (character is not null)
+            character.MoveEnd(position, forward);
     }
 }
